@@ -78,8 +78,9 @@ export function EventFormModal({
                 setStartStr(event.start)
                 setEndStr(event.end)
             } else {
-                setStartStr(formatDateTimeForCalendar(start))
-                setEndStr(formatDateTimeForCalendar(end))
+                // Sadece HH:mm göster (saniye UI'dan gizli, varsayılan :10)
+                setStartStr(formatDateTimeForCalendar(start).slice(0, 16))
+                setEndStr(formatDateTimeForCalendar(end).slice(0, 16))
             }
         } else {
             // Create mode: use defaultStart or now
@@ -93,8 +94,8 @@ export function EventFormModal({
             const primaryCal = calendars.find(c => c.is_primary)
             setCalendarId(primaryCal?.id || calendars[0]?.id || 'primary')
             setAllDay(false)
-            setStartStr(formatDateTimeForCalendar(start))
-            setEndStr(formatDateTimeForCalendar(end))
+            setStartStr(formatDateTimeForCalendar(start).slice(0, 16))
+            setEndStr(formatDateTimeForCalendar(end).slice(0, 16))
         }
     }, [isOpen, event, defaultStart, defaultEnd, calendars])
 
@@ -108,10 +109,10 @@ export function EventFormModal({
                 setStartStr(date)
                 setEndStr(date)
             } else {
-                // Switch back to datetime
+                // Switch back to datetime (saniye gizli)
                 const base = startStr ? new Date(startStr) : new Date()
-                setStartStr(formatDateTimeForCalendar(base))
-                setEndStr(formatDateTimeForCalendar(addHours(base, 1)))
+                setStartStr(formatDateTimeForCalendar(base).slice(0, 16))
+                setEndStr(formatDateTimeForCalendar(addHours(base, 1)).slice(0, 16))
             }
             return next
         })
@@ -131,10 +132,13 @@ export function EventFormModal({
         setError(null)
 
         try {
+            // datetime-local step=60 ile saniye UI'dan gizli; 16 char ise varsayılan :10 ekle
+            const start = startStr.length === 16 ? `${startStr}:10` : startStr
+            const end = endStr.length === 16 ? `${endStr}:10` : endStr
             const payload = buildCalendarEventPayload({
                 summary: title.trim(),
-                start: startStr,
-                end: endStr,
+                start,
+                end,
                 allDay,
                 timeZone: allDay ? undefined : 'Europe/Istanbul',
                 description: description || undefined,
@@ -251,6 +255,7 @@ export function EventFormModal({
                                     </label>
                                     <input
                                         type={allDay ? 'date' : 'datetime-local'}
+                                        step={60}
                                         value={startStr}
                                         onChange={e => setStartStr(e.target.value)}
                                         className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/60 transition-all [color-scheme:dark]"
@@ -263,6 +268,7 @@ export function EventFormModal({
                                     </label>
                                     <input
                                         type={allDay ? 'date' : 'datetime-local'}
+                                        step={60}
                                         value={endStr}
                                         onChange={e => setEndStr(e.target.value)}
                                         className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/60 transition-all [color-scheme:dark]"
