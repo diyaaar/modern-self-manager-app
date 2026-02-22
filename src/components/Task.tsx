@@ -27,7 +27,7 @@ import { useWorkspaces } from '../contexts/WorkspacesContext'
 import { useCalendar } from '../contexts/CalendarContext'
 import { getSupabaseClient } from '../lib/supabase'
 import { calculateCompletionPercentage } from '../utils/taskUtils'
-import { isPast, isToday } from 'date-fns'
+import { isPast, isToday, addHours } from 'date-fns'
 import { getDeadlineColor, formatDeadline } from '../utils/dateUtils'
 import { TaskForm } from './TaskForm'
 import { AISuggestionsModal } from './AISuggestionsModal'
@@ -40,6 +40,7 @@ import { ConfirmDialog } from './ConfirmDialog'
 import { getImageUrl } from '../lib/storage'
 import { TaskLink, TaskImage } from '../types/attachment'
 import { getColorIdFromHex, getColorHexFromId } from '../utils/colorUtils'
+import { formatDateTimeForCalendar, buildCalendarEventPayload } from '../lib/calendarEventFormat'
 
 interface TaskProps {
   task: TaskWithSubtasks
@@ -255,33 +256,9 @@ export function Task({ task, depth = 0 }: TaskProps) {
   const handleAddToCalendar = async () => {
     setIsAddingToCalendar(true)
     try {
-      // To preserve local time and avoid Google Calendar treating it as UTC (which causes a 3hr offset in Turkey timezone),
-      // we format the local date as an ISO-like string WITHOUT the 'Z' suffix.
-      let dateString: string
-
-      const getLocalIsoString = (date: Date) => {
-        const tzOffset = date.getTimezoneOffset() * 60000; // offset in milliseconds
-        const localISOTime = (new Date(date.getTime() - tzOffset)).toISOString().slice(0, -1);
-        // Ensure seconds are present (Google Calendar API requires RFC3339 format)
-        // Format should be: "YYYY-MM-DDTHH:mm:ss" (19 characters)
-        if (localISOTime.length === 16) {
-          // Missing seconds, add ":00"
-          return localISOTime + ':00'
-        } else if (localISOTime.length >= 19) {
-          // Has seconds or more, take first 19 chars (YYYY-MM-DDTHH:mm:ss)
-          return localISOTime.slice(0, 19)
-        }
-        return localISOTime;
-      }
-
-      if (task.deadline) {
-        const deadlineDate = new Date(task.deadline)
-        dateString = getLocalIsoString(deadlineDate)
-      } else {
-        const now = new Date()
-        const oneHourLater = new Date(now.getTime() + 60 * 60 * 1000)
-        dateString = getLocalIsoString(oneHourLater)
-      }
+      const startDate = task.deadline ? new Date(task.deadline) : addHours(new Date(), 1)
+      const startStr = formatDateTimeForCalendar(startDate)
+      const endStr = formatDateTimeForCalendar(addHours(startDate, 1))
 
       // Get color from task's color_id (preferred) or workspace color (fallback)
       let taskColor: string | undefined = undefined
@@ -311,17 +288,18 @@ export function Task({ task, depth = 0 }: TaskProps) {
         }
       }
 
-      const endDate = new Date(new Date(dateString).getTime() + 60 * 60 * 1000) // 1 hour duration
-      const endDateString = getLocalIsoString(endDate)
-
-      const event = await createEvent({
+      const payload = buildCalendarEventPayload({
         summary: task.title,
         description: task.description || '',
-        start: dateString,
-        end: endDateString,
+        start: startStr,
+        end: endStr,
+        allDay: false,
+        timeZone: 'Europe/Istanbul',
         color: taskColor,
-        colorId: colorId,
+        colorId,
       })
+
+      const event = await createEvent(payload)
 
       if (!event) {
         throw new Error('Etkinlik oluşturulamadı. Google Takvim\'in bağlı olduğundan emin olun.')

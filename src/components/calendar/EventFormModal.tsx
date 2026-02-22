@@ -2,8 +2,9 @@ import { useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, Trash2, AlignLeft, Calendar, Clock, Loader2 } from 'lucide-react'
 import { LocationAutocomplete } from './LocationAutocomplete'
-import { format, addHours } from 'date-fns'
+import { addHours } from 'date-fns'
 import { useCalendar, CalendarEvent } from '../../contexts/CalendarContext'
+import { formatDateTimeForCalendar, formatDateForCalendar, buildCalendarEventPayload } from '../../lib/calendarEventFormat'
 
 // Google Calendar's 11 event colors
 const GOOGLE_COLORS: { id: string; name: string; hex: string }[] = [
@@ -28,19 +29,6 @@ interface EventFormModalProps {
     /** Prefill with a default start date/time for create mode */
     defaultStart?: Date
     defaultEnd?: Date
-}
-
-function toLocalDatetimeString(date: Date): string {
-    const year = date.getFullYear()
-    const month = String(date.getMonth() + 1).padStart(2, '0')
-    const day = String(date.getDate()).padStart(2, '0')
-    const hours = String(date.getHours()).padStart(2, '0')
-    const minutes = String(date.getMinutes()).padStart(2, '0')
-    return `${year}-${month}-${day}T${hours}:${minutes}`
-}
-
-function toLocalDateString(date: Date): string {
-    return format(date, 'yyyy-MM-dd')
 }
 
 export function EventFormModal({
@@ -90,8 +78,8 @@ export function EventFormModal({
                 setStartStr(event.start)
                 setEndStr(event.end)
             } else {
-                setStartStr(toLocalDatetimeString(start))
-                setEndStr(toLocalDatetimeString(end))
+                setStartStr(formatDateTimeForCalendar(start))
+                setEndStr(formatDateTimeForCalendar(end))
             }
         } else {
             // Create mode: use defaultStart or now
@@ -105,8 +93,8 @@ export function EventFormModal({
             const primaryCal = calendars.find(c => c.is_primary)
             setCalendarId(primaryCal?.id || calendars[0]?.id || 'primary')
             setAllDay(false)
-            setStartStr(toLocalDatetimeString(start))
-            setEndStr(toLocalDatetimeString(end))
+            setStartStr(formatDateTimeForCalendar(start))
+            setEndStr(formatDateTimeForCalendar(end))
         }
     }, [isOpen, event, defaultStart, defaultEnd, calendars])
 
@@ -116,14 +104,14 @@ export function EventFormModal({
             const next = !prev
             if (next) {
                 // Switch to date-only
-                const date = startStr ? startStr.slice(0, 10) : toLocalDateString(new Date())
+                const date = startStr ? startStr.slice(0, 10) : formatDateForCalendar(new Date())
                 setStartStr(date)
                 setEndStr(date)
             } else {
                 // Switch back to datetime
                 const base = startStr ? new Date(startStr) : new Date()
-                setStartStr(toLocalDatetimeString(base))
-                setEndStr(toLocalDatetimeString(addHours(base, 1)))
+                setStartStr(formatDateTimeForCalendar(base))
+                setEndStr(formatDateTimeForCalendar(addHours(base, 1)))
             }
             return next
         })
@@ -143,57 +131,17 @@ export function EventFormModal({
         setError(null)
 
         try {
-            // Build the payload matching Google Calendar v3 schema.
-            //
-            // ⚠️  CRITICAL: Do NOT use new Date(startStr).toISOString() here.
-            //     `startStr` comes from a <input type="datetime-local"> which yields
-            //     a wall-clock string like "2026-02-21T17:30" with NO timezone info.
-            //     Passing it to `new Date()` makes JS treat it as LOCAL time, then
-            //     `.toISOString()` converts to UTC and appends 'Z' — for Istanbul
-            //     (UTC+3) this results in a 3-hour backwards shift.
-            //
-            //     The correct approach: send the raw wall-clock string as-is and
-            //     pair it with an explicit IANA timeZone. The server's `stripOffset`
-            //     in api/calendar/events.ts already handles stripping any accidental
-            //     suffix before forwarding to Google Calendar, which then interprets
-            //     the time correctly in the declared timezone.
-            let startPayload: string
-            let endPayload: string
-
-            if (allDay) {
-                // For all-day events, send only the date part (YYYY-MM-DD)
-                startPayload = startStr.slice(0, 10)
-                endPayload = endStr.slice(0, 10)
-            } else {
-                // Send the datetime string in RFC3339 format (YYYY-MM-DDTHH:mm:ss)
-                // Google Calendar API requires seconds in the datetime string.
-                // The explicit timeZone field tells Google how to interpret it.
-                // If seconds are missing, add ":00"
-                const formatWithSeconds = (dt: string) => {
-                    if (dt.length === 16) {
-                        // Format: "YYYY-MM-DDTHH:mm" - add seconds
-                        return dt + ':00'
-                    } else if (dt.length >= 19) {
-                        // Format already has seconds or more, take first 19 chars (YYYY-MM-DDTHH:mm:ss)
-                        return dt.slice(0, 19)
-                    }
-                    return dt
-                }
-                startPayload = formatWithSeconds(startStr)
-                endPayload = formatWithSeconds(endStr)
-            }
-
-            const payload: Omit<CalendarEvent, 'id'> & { timeZone?: string } = {
+            const payload = buildCalendarEventPayload({
                 summary: title.trim(),
-                start: startPayload,
-                end: endPayload,
+                start: startStr,
+                end: endStr,
+                allDay,
+                timeZone: allDay ? undefined : 'Europe/Istanbul',
                 description: description || undefined,
                 location: location || undefined,
                 colorId: colorId || undefined,
                 calendarId: calendarId || undefined,
-                allDay,
-                timeZone: allDay ? undefined : 'Europe/Istanbul',
-            }
+            })
 
             if (isEditing && event) {
                 await updateEvent(event.id, payload)

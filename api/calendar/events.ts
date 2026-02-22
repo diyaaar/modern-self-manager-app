@@ -273,7 +273,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       // Determine target Google calendar ID
-      const googleCalendarId = await getGoogleCalendarId(supabase, userId, requestedCalendarId)
+      let googleCalendarId = 'primary'
+      try {
+        googleCalendarId = await getGoogleCalendarId(supabase, userId, requestedCalendarId)
+      } catch (calIdErr: any) {
+        console.error('[events POST] Error getting calendar ID:', calIdErr)
+        // Continue with primary calendar if lookup fails
+        googleCalendarId = 'primary'
+      }
 
       // Always default to Europe/Istanbul for this app; never fall back to server-side UTC
       const tz = timeZone || 'Europe/Istanbul'
@@ -306,24 +313,43 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         // IMPORTANT: Do NOT use new Date(...).toISOString() here.
         // toISOString() always converts to UTC and appends 'Z', which causes Google
         // Calendar to ignore the timeZone field, resulting in a +3h offset for Istanbul.
-        // Instead, normalize the datetime string to RFC3339 format (with seconds)
-        // and pair it with an explicit IANA timeZone.
-        // Inline normalization function to avoid Vercel dynamic import issues
-        const normalizeDateTime = (dt: string): string => {
-          // Remove trailing Z (UTC marker) or timezone offset (+HH:MM / -HH:MM)
+        // Instead, strip any trailing 'Z' or offset suffix and send the local datetime
+        // string as-is, paired with an explicit IANA timeZone.
+        // Ensure seconds are present for RFC3339 compliance
+        const stripOffset = (dt: string) => {
+          if (!dt || typeof dt !== 'string') {
+            console.error('[events POST] Invalid datetime string:', dt)
+            throw new Error(`Invalid datetime string: ${dt}`)
+          }
+          // Remove trailing Z (UTC marker) or +HH:MM / -HH:MM offset so the string
+          // is treated as a "wall clock" time in the given timeZone.
           let cleaned = dt.replace(/(Z|[+-]\d{2}:\d{2})$/, '')
-          // Ensure seconds are present (add ":00" if missing)
-          if (cleaned.length === 16) {
-            // Format: "YYYY-MM-DDTHH:mm" - add seconds
-            cleaned += ':00'
-          } else if (cleaned.length >= 19) {
-            // Format already has seconds, take first 19 chars
+          // Normalize to YYYY-MM-DDTHH:mm:ss (19 chars) for RFC3339 compliance
+          if (cleaned.length >= 19) {
             cleaned = cleaned.slice(0, 19)
+          } else if (cleaned.length === 16) {
+            cleaned += ':00'
+          } else if (cleaned.length >= 10 && cleaned.length < 16) {
+            // "YYYY-MM-DDTHH" or "YYYY-MM-DDTHH:m" etc - pad with :00
+            cleaned = (cleaned + ':00').slice(0, 19)
           }
           return cleaned
         }
-        googleStart = { dateTime: normalizeDateTime(sDt), timeZone: tz }
-        googleEnd = { dateTime: normalizeDateTime(eDt), timeZone: tz }
+        
+        try {
+          googleStart = { dateTime: stripOffset(sDt), timeZone: tz }
+          googleEnd = { dateTime: stripOffset(eDt), timeZone: tz }
+        } catch (formatErr: any) {
+          console.error('[events POST] Error formatting datetime:', {
+            start: sDt,
+            end: eDt,
+            error: formatErr?.message,
+          })
+          return res.status(400).json({ 
+            error: 'Invalid datetime format', 
+            detail: formatErr?.message || 'Failed to parse start/end datetime' 
+          })
+        }
       }
 
       const eventResource = {

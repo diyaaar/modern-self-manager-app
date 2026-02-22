@@ -174,33 +174,35 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           if (endDate) endField = { date: endDate, dateTime: null }
         } else {
           const tz = body.timeZone || 'Europe/Istanbul'
-          // Normalize datetime strings to RFC3339 format (with seconds)
-          // Inline normalization function to avoid Vercel dynamic import issues
-          const normalizeDateTime = (dt: string): string => {
-            // Remove trailing Z (UTC marker) or timezone offset (+HH:MM / -HH:MM)
+          // Strip any trailing Z or +HH:MM offset so Google interprets the time
+          // as a wall-clock time in the given timeZone, not as UTC.
+          // Ensure seconds are present for RFC3339 compliance
+          const stripOffset = (dt: string) => {
+            if (!dt || typeof dt !== 'string') {
+              throw new Error('Invalid datetime string')
+            }
             let cleaned = dt.replace(/(Z|[+-]\d{2}:\d{2})$/, '')
-            // Ensure seconds are present (add ":00" if missing)
-            if (cleaned.length === 16) {
-              // Format: "YYYY-MM-DDTHH:mm" - add seconds
-              cleaned += ':00'
-            } else if (cleaned.length >= 19) {
-              // Format already has seconds, take first 19 chars
+            if (cleaned.length >= 19) {
               cleaned = cleaned.slice(0, 19)
+            } else if (cleaned.length === 16) {
+              cleaned += ':00'
+            } else if (cleaned.length >= 10 && cleaned.length < 16) {
+              cleaned = (cleaned + ':00').slice(0, 19)
             }
             return cleaned
           }
-          if (body.start) startField = { dateTime: normalizeDateTime(body.start), timeZone: tz, date: null }
-          if (body.end) endField = { dateTime: normalizeDateTime(body.end), timeZone: tz, date: null }
+          if (body.start) startField = { dateTime: stripOffset(body.start), timeZone: tz, date: null }
+          if (body.end) endField = { dateTime: stripOffset(body.end), timeZone: tz, date: null }
         }
       } else {
         // Fallback if allDay is not provided (though our frontend sends it)
-        // Inline normalization function to avoid Vercel dynamic import issues
-        const normalizeDateTime = (dt: string): string => {
-          // Remove trailing Z (UTC marker) or timezone offset (+HH:MM / -HH:MM)
+        const stripOffset = (dt: string) => {
+          if (!dt || typeof dt !== 'string') {
+            throw new Error('Invalid datetime string')
+          }
           let cleaned = dt.replace(/(Z|[+-]\d{2}:\d{2})$/, '')
           // Ensure seconds are present (add ":00" if missing)
           if (cleaned.length === 16) {
-            // Format: "YYYY-MM-DDTHH:mm" - add seconds
             cleaned += ':00'
           } else if (cleaned.length >= 19) {
             // Format already has seconds, take first 19 chars
@@ -212,13 +214,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           const isDateOnly = body.start.length === 10
           startField = isDateOnly
             ? { date: body.start }
-            : { dateTime: normalizeDateTime(body.start), timeZone: body.timeZone || 'Europe/Istanbul' }
+            : { dateTime: stripOffset(body.start), timeZone: body.timeZone || 'Europe/Istanbul' }
         }
         if (body.end) {
           const isDateOnly = body.end.length === 10
           endField = isDateOnly
             ? { date: body.end }
-            : { dateTime: normalizeDateTime(body.end), timeZone: body.timeZone || 'Europe/Istanbul' }
+            : { dateTime: stripOffset(body.end), timeZone: body.timeZone || 'Europe/Istanbul' }
         }
       }
 
