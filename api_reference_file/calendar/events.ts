@@ -35,14 +35,8 @@ async function getAuthenticatedCalendar(supabase: ReturnType<typeof getSupabase>
     .eq('user_id', userId)
     .single()
 
-  if (tokenError || !tokens) {
-    if (tokenError && tokenError.code !== 'PGRST116') {
-      console.error('[events] Token fetch error:', tokenError)
-    }
-    return null
-  }
+  if (tokenError || !tokens) return null
 
-  // Refresh token if needed (inline implementation to avoid Vercel dynamic import issues)
   let accessToken = tokens.access_token
   const now = Date.now()
 
@@ -71,9 +65,6 @@ async function getAuthenticatedCalendar(supabase: ReturnType<typeof getSupabase>
             updated_at: new Date().toISOString(),
           })
           .eq('user_id', userId)
-          .catch((err) => {
-            console.warn('[events] Failed to update token in database:', err)
-          })
       }
     } catch (err) {
       console.warn('[events] Token refresh failed, proceeding with existing token:', err)
@@ -87,32 +78,6 @@ async function getAuthenticatedCalendar(supabase: ReturnType<typeof getSupabase>
   oauth2Client.setCredentials({ access_token: accessToken })
 
   return google.calendar({ version: 'v3', auth: oauth2Client })
-}
-
-// ── Helper: Get Google Calendar ID from calendar ID ─────────────
-async function getGoogleCalendarId(
-  supabase: ReturnType<typeof getSupabase>,
-  userId: string,
-  calendarId: string | null | undefined
-): Promise<string> {
-  // Default to primary calendar
-  if (!calendarId || calendarId === 'primary') {
-    return 'primary'
-  }
-
-  // Look up calendar in database
-  const { data: calRecord, error } = await supabase
-    .from('calendars')
-    .select('google_calendar_id')
-    .eq('id', calendarId)
-    .eq('user_id', userId)
-    .maybeSingle()
-
-  if (error && error.code !== 'PGRST116') {
-    console.warn(`[events] Error looking up calendar ${calendarId}:`, error)
-  }
-
-  return calRecord?.google_calendar_id || 'primary'
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -217,23 +182,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               color: cal.color,
             })
           }
-        } catch (err: any) {
-          // Handle specific Google API errors
-          if (err.code === 401 || err.status === 401) {
-            console.error(`[events GET] Authentication failed for calendar ${cal.name}:`, err)
-            // Continue with other calendars instead of failing completely
-            continue
-          }
-          if (err.code === 403 || err.status === 403) {
-            console.error(`[events GET] Access denied for calendar ${cal.name}:`, err)
-            // Continue with other calendars instead of failing completely
-            continue
-          }
-          console.error(`[events GET] Error fetching calendar ${cal.name}:`, {
-            message: err?.message,
-            code: err?.code,
-            status: err?.status,
-          })
+        } catch (err) {
+          console.error(`[events GET] Error fetching calendar ${cal.name}:`, err)
         }
       }
 
@@ -273,7 +223,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       // Determine target Google calendar ID
-      const googleCalendarId = await getGoogleCalendarId(supabase, userId, requestedCalendarId)
+      let googleCalendarId = 'primary'
+      if (requestedCalendarId && requestedCalendarId !== 'primary') {
+        const { data: calRecord } = await supabase
+          .from('calendars')
+          .select('google_calendar_id')
+          .eq('id', requestedCalendarId)
+          .eq('user_id', userId)
+          .maybeSingle()
+        if (calRecord?.google_calendar_id) {
+          googleCalendarId = calRecord.google_calendar_id
+        }
+      }
 
       // Always default to Europe/Istanbul for this app; never fall back to server-side UTC
       const tz = timeZone || 'Europe/Istanbul'
@@ -286,16 +247,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       if (isAllDay) {
         const sDate = startDate || (typeof start === 'string' ? start.slice(0, 10) : null)
-        let eDate = endDate || (typeof end === 'string' ? end.slice(0, 10) : sDate)
+        const eDate = endDate || (typeof end === 'string' ? end.slice(0, 10) : sDate)
         if (!sDate) return res.status(400).json({ error: 'startDate is required for all-day events' })
-
-        // Google Calendar requires all-day event end-dates to be exclusive
-        if (sDate === eDate) {
-          const d = new Date(sDate)
-          d.setDate(d.getDate() + 1)
-          eDate = d.toISOString().slice(0, 10)
-        }
-
         googleStart = { date: sDate }
         googleEnd = { date: eDate || sDate }
       } else {
@@ -306,24 +259,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         // IMPORTANT: Do NOT use new Date(...).toISOString() here.
         // toISOString() always converts to UTC and appends 'Z', which causes Google
         // Calendar to ignore the timeZone field, resulting in a +3h offset for Istanbul.
-        // Instead, normalize the datetime string to RFC3339 format (with seconds)
-        // and pair it with an explicit IANA timeZone.
-        // Inline normalization function to avoid Vercel dynamic import issues
-        const normalizeDateTime = (dt: string): string => {
-          // Remove trailing Z (UTC marker) or timezone offset (+HH:MM / -HH:MM)
-          let cleaned = dt.replace(/(Z|[+-]\d{2}:\d{2})$/, '')
-          // Ensure seconds are present (add ":00" if missing)
-          if (cleaned.length === 16) {
-            // Format: "YYYY-MM-DDTHH:mm" - add seconds
-            cleaned += ':00'
-          } else if (cleaned.length >= 19) {
-            // Format already has seconds, take first 19 chars
-            cleaned = cleaned.slice(0, 19)
-          }
-          return cleaned
+        // Instead, strip any trailing 'Z' or offset suffix and send the local datetime
+        // string as-is, paired with an explicit IANA timeZone.
+        const stripOffset = (dt: string) => {
+          // Remove trailing Z (UTC marker) or +HH:MM / -HH:MM offset so the string
+          // is treated as a "wall clock" time in the given timeZone.
+          return dt.replace(/(Z|[+-]\d{2}:\d{2})$/, '').slice(0, 19)
         }
-        googleStart = { dateTime: normalizeDateTime(sDt), timeZone: tz }
-        googleEnd = { dateTime: normalizeDateTime(eDt), timeZone: tz }
+        googleStart = { dateTime: stripOffset(sDt), timeZone: tz }
+        googleEnd = { dateTime: stripOffset(eDt), timeZone: tz }
       }
 
       const eventResource = {
@@ -356,19 +300,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       })
 
     } catch (err: any) {
-      // Handle specific Google API errors
-      if (err.code === 401 || err.status === 401) {
-        return res.status(401).json({
-          error: 'Google Calendar authentication failed',
-          detail: err?.message,
-        })
-      }
-      if (err.code === 403 || err.status === 403) {
-        return res.status(403).json({
-          error: 'Google Calendar access denied',
-          detail: err?.message,
-        })
-      }
       console.error('[events POST] Error creating event:', {
         message: err?.message,
         code: err?.code,

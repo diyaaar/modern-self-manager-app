@@ -32,45 +32,49 @@ async function getAuthenticatedCalendar(supabase: any, userId: string) {
     return null
   }
 
-  // Use shared token refresh utility
-  const { refreshGoogleToken } = await import('../_lib/tokenRefresh')
-  const refreshResult = await refreshGoogleToken(
-    tokens.access_token,
-    tokens.refresh_token,
-    tokens.expiry_date
-  )
+  // Refresh token if needed (inline implementation to avoid Vercel dynamic import issues)
+  let accessToken = tokens.access_token
+  const now = Date.now()
 
-  // If refresh failed and token is expired, return null
-  if (!refreshResult.success) {
-    const now = Date.now()
-    if (tokens.expiry_date - now < 0) {
-      console.error('[events/[id]] Token expired and refresh failed:', refreshResult.error)
-      return null
+  // Proactively refresh if token expires within 5 minutes
+  if (tokens.expiry_date - now < 5 * 60 * 1000) {
+    try {
+      const refreshResponse = await fetch('https://oauth2.googleapis.com/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          client_id: process.env.GOOGLE_CLIENT_ID!,
+          client_secret: process.env.GOOGLE_CLIENT_SECRET!,
+          refresh_token: tokens.refresh_token,
+          grant_type: 'refresh_token',
+        }),
+      })
+
+      if (refreshResponse.ok) {
+        const refreshData = await refreshResponse.json()
+        accessToken = refreshData.access_token
+        await supabase
+          .from('google_calendar_tokens')
+          .update({
+            access_token: refreshData.access_token,
+            expiry_date: Date.now() + (refreshData.expires_in * 1000),
+            updated_at: new Date().toISOString(),
+          })
+          .eq('user_id', userId)
+          .catch((err) => {
+            console.warn('[events/[id]] Failed to update token in database:', err)
+          })
+      }
+    } catch (err) {
+      console.warn('[events/[id]] Token refresh failed, proceeding with existing token:', err)
     }
-    // If token is still valid, proceed with existing token
-    console.warn('[events/[id]] Token refresh failed but using existing token:', refreshResult.error)
-  }
-
-  // Update token in database if refresh was successful
-  if (refreshResult.success && refreshResult.accessToken !== tokens.access_token) {
-    await supabase
-      .from('google_calendar_tokens')
-      .update({
-        access_token: refreshResult.accessToken,
-        expiry_date: refreshResult.expiryDate,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('user_id', userId)
-      .catch((err) => {
-        console.warn('[events/[id]] Failed to update token in database:', err)
-      })
   }
 
   const oauth2Client = new google.auth.OAuth2(
     process.env.GOOGLE_CLIENT_ID,
     process.env.GOOGLE_CLIENT_SECRET
   )
-  oauth2Client.setCredentials({ access_token: refreshResult.accessToken })
+  oauth2Client.setCredentials({ access_token: accessToken })
 
   return google.calendar({ version: 'v3', auth: oauth2Client })
 }
@@ -171,25 +175,50 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         } else {
           const tz = body.timeZone || 'Europe/Istanbul'
           // Normalize datetime strings to RFC3339 format (with seconds)
-          // and pair with explicit timeZone so Google interprets correctly
-          const { normalizeDateTimeForGoogle } = await import('../_lib/dateFormat')
-          if (body.start) startField = { dateTime: normalizeDateTimeForGoogle(body.start), timeZone: tz, date: null }
-          if (body.end) endField = { dateTime: normalizeDateTimeForGoogle(body.end), timeZone: tz, date: null }
+          // Inline normalization function to avoid Vercel dynamic import issues
+          const normalizeDateTime = (dt: string): string => {
+            // Remove trailing Z (UTC marker) or timezone offset (+HH:MM / -HH:MM)
+            let cleaned = dt.replace(/(Z|[+-]\d{2}:\d{2})$/, '')
+            // Ensure seconds are present (add ":00" if missing)
+            if (cleaned.length === 16) {
+              // Format: "YYYY-MM-DDTHH:mm" - add seconds
+              cleaned += ':00'
+            } else if (cleaned.length >= 19) {
+              // Format already has seconds, take first 19 chars
+              cleaned = cleaned.slice(0, 19)
+            }
+            return cleaned
+          }
+          if (body.start) startField = { dateTime: normalizeDateTime(body.start), timeZone: tz, date: null }
+          if (body.end) endField = { dateTime: normalizeDateTime(body.end), timeZone: tz, date: null }
         }
       } else {
         // Fallback if allDay is not provided (though our frontend sends it)
-        const { normalizeDateTimeForGoogle } = await import('../_lib/dateFormat')
+        // Inline normalization function to avoid Vercel dynamic import issues
+        const normalizeDateTime = (dt: string): string => {
+          // Remove trailing Z (UTC marker) or timezone offset (+HH:MM / -HH:MM)
+          let cleaned = dt.replace(/(Z|[+-]\d{2}:\d{2})$/, '')
+          // Ensure seconds are present (add ":00" if missing)
+          if (cleaned.length === 16) {
+            // Format: "YYYY-MM-DDTHH:mm" - add seconds
+            cleaned += ':00'
+          } else if (cleaned.length >= 19) {
+            // Format already has seconds, take first 19 chars
+            cleaned = cleaned.slice(0, 19)
+          }
+          return cleaned
+        }
         if (body.start) {
           const isDateOnly = body.start.length === 10
           startField = isDateOnly
             ? { date: body.start }
-            : { dateTime: normalizeDateTimeForGoogle(body.start), timeZone: body.timeZone || 'Europe/Istanbul' }
+            : { dateTime: normalizeDateTime(body.start), timeZone: body.timeZone || 'Europe/Istanbul' }
         }
         if (body.end) {
           const isDateOnly = body.end.length === 10
           endField = isDateOnly
             ? { date: body.end }
-            : { dateTime: normalizeDateTimeForGoogle(body.end), timeZone: body.timeZone || 'Europe/Istanbul' }
+            : { dateTime: normalizeDateTime(body.end), timeZone: body.timeZone || 'Europe/Istanbul' }
         }
       }
 

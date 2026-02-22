@@ -79,41 +79,51 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(401).json({ error: 'Google Calendar not connected' })
       }
 
-      // Refresh token if needed using shared utility
-      const { refreshGoogleToken } = await import('./_lib/tokenRefresh')
-      const refreshResult = await refreshGoogleToken(
-        tokens.access_token,
-        tokens.refresh_token,
-        tokens.expiry_date
-      )
+      // Refresh token if needed (inline implementation to avoid Vercel dynamic import issues)
+      const now = Date.now()
+      let accessToken = tokens.access_token
 
-      // If refresh failed and token is expired, return error
-      if (!refreshResult.success) {
-        const now = Date.now()
-        if (tokens.expiry_date - now < 0) {
-          console.error('[calendars POST] Token expired and refresh failed:', refreshResult.error)
-          return res.status(401).json({ error: 'Google Calendar token expired. Please reconnect.' })
+      if (tokens.expiry_date - now < 5 * 60 * 1000) {
+        try {
+          const refreshResponse = await fetch('https://oauth2.googleapis.com/token', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({
+              client_id: process.env.GOOGLE_CLIENT_ID!,
+              client_secret: process.env.GOOGLE_CLIENT_SECRET!,
+              refresh_token: tokens.refresh_token,
+              grant_type: 'refresh_token',
+            }),
+          })
+
+          if (refreshResponse.ok) {
+            const refreshData = await refreshResponse.json()
+            accessToken = refreshData.access_token
+
+            await supabase
+              .from('google_calendar_tokens')
+              .update({
+                access_token: refreshData.access_token,
+                expiry_date: Date.now() + (refreshData.expires_in * 1000),
+                updated_at: new Date().toISOString(),
+              })
+              .eq('user_id', userId)
+              .catch((err) => {
+                console.warn('[calendars POST] Failed to update token in database:', err)
+              })
+          } else {
+            // If refresh failed but token is still valid, proceed with existing token
+            if (tokens.expiry_date - now >= 0) {
+              console.warn('[calendars POST] Token refresh failed but using existing token')
+            } else {
+              console.error('[calendars POST] Token expired and refresh failed')
+              return res.status(401).json({ error: 'Google Calendar token expired. Please reconnect.' })
+            }
+          }
+        } catch (err) {
+          console.warn('[calendars POST] Token refresh error, proceeding with existing token:', err)
         }
-        // If token is still valid, proceed with existing token
-        console.warn('[calendars POST] Token refresh failed but using existing token:', refreshResult.error)
       }
-
-      // Update token in database if refresh was successful
-      if (refreshResult.success && refreshResult.accessToken !== tokens.access_token) {
-        await supabase
-          .from('google_calendar_tokens')
-          .update({
-            access_token: refreshResult.accessToken,
-            expiry_date: refreshResult.expiryDate,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('user_id', userId)
-          .catch((err) => {
-            console.warn('[calendars POST] Failed to update token in database:', err)
-          })
-      }
-
-      const accessToken = refreshResult.accessToken
 
       // Initialize Google Calendar API
       const oauth2Client = new google.auth.OAuth2(
