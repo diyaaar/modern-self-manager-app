@@ -17,7 +17,7 @@ import {
   horizontalListSortingStrategy,
   useSortable,
 } from '@dnd-kit/sortable'
-import { CSS } from '@dnd-kit/utilities'
+import { CSS as dndCSS } from '@dnd-kit/utilities'
 
 import { useWorkspaces } from '../contexts/WorkspacesContext'
 import { useToast } from '../contexts/ToastContext'
@@ -50,7 +50,7 @@ function SortableWorkspaceTab({
   } = useSortable({ id: workspace.id })
 
   const style = {
-    transform: CSS.Transform.toString(transform),
+    transform: dndCSS.Transform.toString(transform),
     transition,
     zIndex: isDragging ? 50 : undefined,
     opacity: isDragging ? 0.5 : undefined,
