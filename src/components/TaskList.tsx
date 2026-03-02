@@ -1,11 +1,33 @@
-import { memo } from 'react'
-import { DndContext, closestCenter, KeyboardSensor, TouchSensor, MouseSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core'
+import { useState, memo } from 'react'
+import { DndContext, closestCenter, KeyboardSensor, TouchSensor, MouseSensor, useSensor, useSensors, DragEndEvent, DragStartEvent, DragOverlay, defaultDropAnimationSideEffects } from '@dnd-kit/core'
 import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { GripVertical } from 'lucide-react'
 import { TaskWithSubtasks } from '../types/task'
 import { Task } from './Task'
 import { useTasks } from '../contexts/TasksContext'
+
+interface TaskRowProps {
+  task: TaskWithSubtasks
+  depth?: number
+  dragHandleProps?: any
+}
+
+function TaskRow({ task, depth = 0, dragHandleProps }: TaskRowProps) {
+  return (
+    <div className="flex items-start gap-1">
+      <button
+        {...dragHandleProps}
+        className="mt-3 p-2 cursor-grab active:cursor-grabbing text-text-tertiary hover:text-text-secondary transition-colors touch-none"
+      >
+        <GripVertical className="w-5 h-5" />
+      </button>
+      <div className="flex-1 min-w-0">
+        <Task task={task} depth={depth} />
+      </div>
+    </div>
+  )
+}
 
 interface SortableTaskProps {
   task: TaskWithSubtasks
@@ -17,32 +39,25 @@ function SortableTask({ task, depth = 0 }: SortableTaskProps) {
     id: task.id,
   })
 
+  // CSS.Translate is smoother and prevents scale-clipping bugs during list reorders
   const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.5 : 1,
+    transform: CSS.Translate.toString(transform),
+    transition: transition || 'transform 250ms cubic-bezier(0.2, 0, 0, 1)',
+    opacity: isDragging ? 0.3 : 1, // original item becomes ghost
+    zIndex: isDragging ? 0 : 1,
   }
 
   return (
     <div ref={setNodeRef} style={style}>
-      <div className="flex items-start gap-1">
-        <button
-          {...attributes}
-          {...listeners}
-          className="mt-3 p-2 cursor-grab active:cursor-grabbing text-text-tertiary hover:text-text-secondary transition-colors touch-none"
-        >
-          <GripVertical className="w-5 h-5" />
-        </button>
-        <div className="flex-1 min-w-0">
-          <Task task={task} depth={depth} />
-        </div>
-      </div>
+      <TaskRow task={task} depth={depth} dragHandleProps={{ ...attributes, ...listeners }} />
     </div>
   )
 }
 
 export const TaskList = memo(function TaskList() {
   const { filteredAndSortedTasks, updateTask } = useTasks()
+  const [activeId, setActiveId] = useState<string | null>(null)
+
   const sensors = useSensors(
     useSensor(MouseSensor, {
       activationConstraint: {
@@ -60,7 +75,16 @@ export const TaskList = memo(function TaskList() {
     })
   )
 
+  const handleDragStart = (event: DragStartEvent) => {
+    setActiveId(event.active.id as string)
+  }
+
+  const handleDragCancel = () => {
+    setActiveId(null)
+  }
+
   const handleDragEnd = async (event: DragEndEvent) => {
+    setActiveId(null)
     const { active, over } = event
 
     if (!over || active.id === over.id) return
@@ -75,12 +99,12 @@ export const TaskList = memo(function TaskList() {
     const reordered = arrayMove(rootTasks, oldIndex, newIndex)
 
     // Persist new positions for every task whose index changed
-    const updates: Array<{ id: string; position: number }> = reordered
+    const updates = reordered
       .map((task: TaskWithSubtasks, index: number) => ({ id: task.id, position: index }))
-      .filter((item: { id: string; position: number }, index: number) => rootTasks[index]?.id !== item.id)
+      .filter((item, index) => rootTasks[index]?.id !== item.id)
 
     await Promise.all(
-      updates.map(({ id, position }: { id: string; position: number }) =>
+      updates.map(({ id, position }) =>
         updateTask(id, { position }, true /* suppressToast */)
       )
     )
@@ -95,20 +119,43 @@ export const TaskList = memo(function TaskList() {
   }
 
   const rootTaskIds = filteredAndSortedTasks.map((task) => task.id)
+  const activeTask = activeId ? filteredAndSortedTasks.find(t => t.id === activeId) : null
 
   return (
     <DndContext
       sensors={sensors}
       collisionDetection={closestCenter}
+      onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
+      onDragCancel={handleDragCancel}
     >
       <SortableContext items={rootTaskIds} strategy={verticalListSortingStrategy}>
-        <div className="space-y-2">
+        <div className="space-y-2 relative">
           {filteredAndSortedTasks.map((task) => (
             <SortableTask key={task.id} task={task} depth={0} />
           ))}
         </div>
       </SortableContext>
+      
+      {/* DragOverlay mounts the active item in a portal to pop it out of layout */}
+      <DragOverlay
+        dropAnimation={{
+          // Adds a nice snapping animation when dropping
+          sideEffects: defaultDropAnimationSideEffects({
+            styles: {
+              active: {
+                opacity: '0.4',
+              },
+            },
+          }),
+        }}
+      >
+        {activeTask ? (
+          <div className="opacity-100 shadow-2xl scale-[1.02] cursor-grabbing rotate-1 rounded-xl transition-transform origin-center">
+            <TaskRow task={activeTask} depth={0} />
+          </div>
+        ) : null}
+      </DragOverlay>
     </DndContext>
   )
 })
