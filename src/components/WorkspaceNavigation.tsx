@@ -1,10 +1,104 @@
 import { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ChevronLeft, ChevronRight, Plus } from 'lucide-react'
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core'
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  horizontalListSortingStrategy,
+  useSortable,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
+
 import { useWorkspaces } from '../contexts/WorkspacesContext'
 import { useToast } from '../contexts/ToastContext'
 import { CreateWorkspaceModal } from './CreateWorkspaceModal'
 import { ConfirmDialog } from './ConfirmDialog'
+import { Workspace } from '../types/workspace'
+
+interface SortableWorkspaceTabProps {
+  workspace: Workspace
+  isActive: boolean
+  onClick: () => void
+  onDoubleClick: () => void
+  onContextMenu: (e: React.MouseEvent) => void
+}
+
+function SortableWorkspaceTab({
+  workspace,
+  isActive,
+  onClick,
+  onDoubleClick,
+  onContextMenu,
+}: SortableWorkspaceTabProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: workspace.id })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    zIndex: isDragging ? 50 : undefined,
+    opacity: isDragging ? 0.5 : undefined,
+  }
+
+  return (
+    <motion.button
+      ref={setNodeRef}
+      style={{
+        ...style,
+        color: isActive ? workspace.color : undefined,
+      }}
+      {...attributes}
+      {...listeners}
+      data-workspace-id={workspace.id}
+      initial={{ opacity: 0, scale: 0.9 }}
+      animate={{ opacity: 1, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.9 }}
+      whileHover={{ scale: 1.05 }}
+      whileTap={{ scale: 0.95 }}
+      onClick={onClick}
+      onDoubleClick={onDoubleClick}
+      onContextMenu={onContextMenu}
+      className={`
+        flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 md:px-4 py-1.5 sm:py-2 rounded-lg sm:rounded-xl transition-all
+        min-h-[44px] touch-manipulation relative
+        ${isActive ? '' : 'hover:bg-background-tertiary/50 active:bg-background-tertiary/70'}
+      `}
+    >
+      <span className="text-base sm:text-lg flex-shrink-0">{workspace.icon}</span>
+      <span className="text-xs sm:text-sm font-medium whitespace-nowrap truncate max-w-[100px] sm:max-w-none">{workspace.name}</span>
+      {isActive && (
+        <motion.div
+          layoutId="activeTabIndicator"
+          className="absolute bottom-0 left-0 right-0 h-0.5 rounded-full"
+          style={{
+            backgroundColor: workspace.color,
+          }}
+          transition={{
+            type: 'spring',
+            stiffness: 500,
+            damping: 30,
+          }}
+        />
+      )}
+    </motion.button>
+  )
+}
 
 export function WorkspaceNavigation() {
   const {
@@ -12,6 +106,7 @@ export function WorkspaceNavigation() {
     currentWorkspaceId,
     setCurrentWorkspaceId,
     deleteWorkspace,
+    reorderWorkspaces,
   } = useWorkspaces()
   const { showToast } = useToast()
   const [showCreateModal, setShowCreateModal] = useState(false)
@@ -20,6 +115,40 @@ export function WorkspaceNavigation() {
   const [editingWorkspaceId, setEditingWorkspaceId] = useState<string | null>(null)
   const [contextMenu, setContextMenu] = useState<{ workspaceId: string; x: number; y: number } | null>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
+
+  const [localWorkspaces, setLocalWorkspaces] = useState<Workspace[]>([])
+
+  useEffect(() => {
+    setLocalWorkspaces(workspaces)
+  }, [workspaces])
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        delay: 200,
+        tolerance: 5,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  )
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event
+
+    if (active && over && active.id !== over.id) {
+      setLocalWorkspaces((items) => {
+        const oldIndex = items.findIndex((w) => w.id === active.id)
+        const newIndex = items.findIndex((w) => w.id === over.id)
+
+        const newItems = arrayMove(items, oldIndex, newIndex)
+        // Call backend with new order
+        reorderWorkspaces(newItems.map((w: Workspace) => w.id))
+        return newItems
+      })
+    }
+  }
 
   // Auto-scroll when active workspace changes
   useEffect(() => {
@@ -145,50 +274,32 @@ export function WorkspaceNavigation() {
               ref={scrollContainerRef}
               className="flex items-center gap-1 overflow-x-auto scrollbar-hide"
             >
-              <AnimatePresence mode="popLayout">
-                {workspaces.map((workspace) => {
-                  const isActive = workspace.id === currentWorkspaceId
-                  return (
-                    <motion.button
-                      key={workspace.id}
-                      data-workspace-id={workspace.id}
-                      initial={{ opacity: 0, scale: 0.9 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      exit={{ opacity: 0, scale: 0.9 }}
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
-                      onClick={() => setCurrentWorkspaceId(workspace.id)}
-                      onDoubleClick={() => handleEdit(workspace.id)}
-                      onContextMenu={(e) => handleContextMenu(e, workspace.id)}
-                      className={`
-                        flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 md:px-4 py-1.5 sm:py-2 rounded-lg sm:rounded-xl transition-all
-                        min-h-[44px] touch-manipulation relative
-                        ${isActive ? '' : 'hover:bg-background-tertiary/50 active:bg-background-tertiary/70'}
-                      `}
-                      style={{
-                        color: isActive ? workspace.color : undefined,
-                      }}
-                    >
-                      <span className="text-base sm:text-lg flex-shrink-0">{workspace.icon}</span>
-                      <span className="text-xs sm:text-sm font-medium whitespace-nowrap truncate max-w-[100px] sm:max-w-none">{workspace.name}</span>
-                      {isActive && (
-                        <motion.div
-                          layoutId="activeTabIndicator"
-                          className="absolute bottom-0 left-0 right-0 h-0.5 rounded-full"
-                          style={{
-                            backgroundColor: workspace.color,
-                          }}
-                          transition={{
-                            type: 'spring',
-                            stiffness: 500,
-                            damping: 30,
-                          }}
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={handleDragEnd}
+              >
+                <SortableContext
+                  items={localWorkspaces.map((w: Workspace) => w.id)}
+                  strategy={horizontalListSortingStrategy}
+                >
+                  <AnimatePresence mode="popLayout">
+                    {localWorkspaces.map((workspace) => {
+                      const isActive = workspace.id === currentWorkspaceId
+                      return (
+                        <SortableWorkspaceTab
+                          key={workspace.id}
+                          workspace={workspace}
+                          isActive={isActive}
+                          onClick={() => setCurrentWorkspaceId(workspace.id)}
+                          onDoubleClick={() => handleEdit(workspace.id)}
+                          onContextMenu={(e) => handleContextMenu(e, workspace.id)}
                         />
-                      )}
-                    </motion.button>
-                  )
-                })}
-              </AnimatePresence>
+                      )
+                    })}
+                  </AnimatePresence>
+                </SortableContext>
+              </DndContext>
             </div>
 
             {/* Next Button */}
