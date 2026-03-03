@@ -59,11 +59,11 @@ Piyasadaki karmaşık proje yönetimi araçlarına ya da birbirinden kopuk uygul
 - Tekrarlayan görev şablonları
 
 ### 📅 Takvim & Google Entegrasyonu
-- Google Takvim hesabımla sorunsuz bağlantı (OAuth2)
-- Görevlerimi tek tıkla takvimime etkinlik olarak gönderebiliyorum
-- Manuel senkronizasyon kontrolü sayesinde istemediğim hiçbir şey takvime eklenmiyor
-- Tam gün (All-day) etkinlikleri ve saat hassasiyetli planlamaları kusursuz yönetiyor
-- Token bileşenleri tamamen sunucu (server-side) tarafında saklanıp güvenliğim korunuyor
+- Google Takvim ile sorunsuz bağlantı (OAuth2)
+- Görevleri tek tıkla takvime etkinlik olarak gönderebilme
+- Manuel senkronizasyon kontrolü ile sadece istenen görevlerin takvime eklenmesi
+- Tam gün (All-day) etkinlikleri ve saat hassasiyetli planlama yönetimi
+- Token bileşenlerinin tamamen sunucu (server-side) tarafında saklanmasıyla sağlanan yüksek güvenlik
 
 ### 💰 Finans Modülü
 - Nakit bazlı muhasebe (tahakkuk yok)
@@ -119,8 +119,8 @@ Her tablo: `user_id + RLS + soft delete` ile güvence altındadır.
 
 ```bash
 # Repoyu klonla
-git clone https://github.com/[kullaniciadin]/modern-self-manager.git
-cd modern-self-manager
+git clone https://github.com/[kullaniciadin]/modern-self-manager-app.git
+cd modern-self-manager-app
 
 # Bağımlılıkları yükle
 npm install
@@ -168,6 +168,10 @@ src/
 ---
 
 <div align="center">
+
+📱 **Mobil Deneyim**: Bu platform sadece masaüstünde değil, doğrudan kendi telefonumda da (PWA/WebView aracılığıyla iOS ve Android) mobil uygulama (APK/Home Screen App) gibi kusursuz çalışacak şekilde tasarlandı ve şu an aktif olarak telefonumda bu şekilde kullanıyorum.
+
+<br>
 
 👨‍💻 Tamamen kişisel ihtiyaçlarım doğrultusunda, **Vibe Coding** (Antigravity, Claude, ChatGPT, Gemini) yaklaşımıyla benim tarafımdan geliştirilmiştir.
 
