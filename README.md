@@ -4,7 +4,9 @@
 
 **Kişisel üretkenliğini tek bir yerden yönet.**
 
-Görevler, finans takibi ve dosya yönetimini bir araya getiren, tamamen kişisel kullanım için tasarlanmış modern bir web uygulaması.
+Görevler, finans takibi ve dosya yönetimini bir araya getiren, tamamen kişisel kullanımım için kendi ihtiyaçlarıma yönelik tasarlayıp geliştirdiğim modern bir web uygulaması.
+
+> 🤖 **Vibe Coding ile Geliştirildi**: Bu projeyi kodlarken yapay zeka araçlarından (Antigravity, Claude 3.7 Sonnet / Opus, ChatGPT 4o ve Gemini) faydalandım ve **"vibe coding"** yaklaşımıyla geliştirdim.
 
 ![Made with](https://img.shields.io/badge/React-18-61DAFB?style=flat-square&logo=react)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?style=flat-square&logo=typescript)
@@ -17,9 +19,9 @@ Görevler, finans takibi ve dosya yönetimini bir araya getiren, tamamen kişise
 
 ## 🌟 Nedir?
 
-**Modern Self-Manager**, günlük hayatını organize etmek için ihtiyaç duyduğun her şeyi tek bir arayüzde sunan kişisel bir yönetim sistemidir.
+**Modern Self-Manager**, günlük hayatımı organize etmek için ihtiyaç duyduğum her şeyi tek bir arayüzde toplamak amacıyla geliştirdiğim kişisel yönetim sistemimdir.
 
-Karmaşık proje yönetimi araçlarına ya da birbirinden kopuk uygulamalara ihtiyaç duymadan; görevlerini, harcamalarını ve dosyalarını sade, hızlı ve güçlü bir arayüzle takip edebilirsin.
+Piyasadaki karmaşık proje yönetimi araçlarına ya da birbirinden kopuk uygulamalara mecbur kalmamak adına; kendi görevlerimi, harcamalarımı ve dosyalarımı sade, hızlı ve güçlü bir arayüzle takip edebileceğim bu özel platformu kodladım.
 
 ---
 
@@ -111,7 +113,7 @@ Her tablo: `user_id + RLS + soft delete` ile güvence altındadır.
 
 ```bash
 # Repoyu klonla
-git clone https://github.com/[kullanici]/modern-self-manager.git
+git clone https://github.com/[kullaniciadin]/modern-self-manager.git
 cd modern-self-manager
 
 # Bağımlılıkları yükle
@@ -161,6 +163,6 @@ src/
 
 <div align="center">
 
-Kişisel kullanım için geliştirilmiştir. 
+👨‍💻 Tamamen kişisel ihtiyaçlarım doğrultusunda, **Vibe Coding** (Antigravity, Claude, ChatGPT, Gemini) yaklaşımıyla benim tarafımdan geliştirilmiştir.
 
 </div>
