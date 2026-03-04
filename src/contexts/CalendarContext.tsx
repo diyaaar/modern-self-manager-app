@@ -134,6 +134,13 @@ export function CalendarProvider({ children }: { children: ReactNode }) {
           }
           return
         }
+      } else if (syncResponse.status === 401) {
+        // Token expired or revoked — show "Connect" button
+        console.warn('Google Calendar token expired or revoked, resetting auth state')
+        setIsAuthenticated(false)
+        setCalendars([])
+        setSelectedCalendarIds([])
+        return
       }
 
       // Fallback: fetch from database directly
