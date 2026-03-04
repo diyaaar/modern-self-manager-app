@@ -84,28 +84,37 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       let accessToken = tokens.access_token
 
       if (tokens.expiry_date - now < 5 * 60 * 1000) {
-        const refreshResponse = await fetch('https://oauth2.googleapis.com/token', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: new URLSearchParams({
-            client_id: process.env.GOOGLE_CLIENT_ID!,
-            client_secret: process.env.GOOGLE_CLIENT_SECRET!,
-            refresh_token: tokens.refresh_token,
-            grant_type: 'refresh_token',
-          }),
-        })
+        try {
+          const refreshResponse = await fetch('https://oauth2.googleapis.com/token', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({
+              client_id: process.env.GOOGLE_CLIENT_ID!,
+              client_secret: process.env.GOOGLE_CLIENT_SECRET!,
+              refresh_token: tokens.refresh_token,
+              grant_type: 'refresh_token',
+            }),
+          })
 
-        if (refreshResponse.ok) {
-          const refreshData = await refreshResponse.json()
-          accessToken = refreshData.access_token
+          if (refreshResponse.ok) {
+            const refreshData = await refreshResponse.json()
+            accessToken = refreshData.access_token
 
-          await supabase
-            .from('google_calendar_tokens')
-            .update({
-              access_token: refreshData.access_token,
-              expiry_date: Date.now() + (refreshData.expires_in * 1000),
-            })
-            .eq('user_id', userId)
+            await supabase
+              .from('google_calendar_tokens')
+              .update({
+                access_token: refreshData.access_token,
+                expiry_date: Date.now() + (refreshData.expires_in * 1000),
+              })
+              .eq('user_id', userId)
+          } else {
+            // Token refresh failed — token may be revoked
+            console.error('[calendars POST] Token refresh failed:', await refreshResponse.text().catch(() => ''))
+            return res.status(401).json({ error: 'Google Calendar token expired. Please reconnect.' })
+          }
+        } catch (refreshErr) {
+          console.error('[calendars POST] Token refresh error:', refreshErr)
+          return res.status(401).json({ error: 'Google Calendar token refresh failed. Please reconnect.' })
         }
       }
 
@@ -119,11 +128,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const calendar = google.calendar({ version: 'v3', auth: oauth2Client })
 
       // Fetch calendar list from Google
-      const response = await calendar.calendarList.list({
-        minAccessRole: 'reader',
-      })
-
-      const googleCalendars = response.data.items || []
+      let googleCalendars: any[] = []
+      try {
+        const response = await calendar.calendarList.list({
+          minAccessRole: 'reader',
+        })
+        googleCalendars = response.data.items || []
+      } catch (apiError: any) {
+        console.error('[calendars POST] Google Calendar API error:', apiError?.message)
+        if (apiError?.code === 401 || apiError?.status === 401) {
+          return res.status(401).json({ error: 'Google Calendar authentication failed. Please reconnect.' })
+        }
+        throw apiError
+      }
 
       // Map Google Calendar colors
       const colorMap: Record<string, string> = {
@@ -194,8 +211,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       console.error('[calendars POST] Error syncing calendars:', {
         message: err?.message,
         code: err?.code,
-        stack: err?.stack,
       })
+      // Return 401 for auth-related errors instead of 500
+      if (err?.message?.includes('authentication credentials') || err?.code === 401) {
+        return res.status(401).json({ error: 'Google Calendar authentication failed. Please reconnect.' })
+      }
       return res.status(500).json({ error: 'Failed to sync calendars', detail: err?.message })
     }
   }

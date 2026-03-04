@@ -234,8 +234,13 @@ export function CalendarProvider({ children }: { children: ReactNode }) {
   }, [user, showToast])
 
   const disconnectGoogleCalendar = useCallback(async () => {
+    if (!user) {
+      showToast('Google Takvim\'i bağlantısını kesmek için lütfen giriş yapın', 'error', 3000)
+      return
+    }
+
     try {
-      const response = await fetch('/api/calendar/auth/disconnect', {
+      const response = await fetch(`/api/calendar/auth/disconnect?user_id=${user.id}`, {
         method: 'POST',
       })
 
@@ -245,12 +250,14 @@ export function CalendarProvider({ children }: { children: ReactNode }) {
 
       setIsAuthenticated(false)
       setEvents([])
+      setCalendars([])
+      setSelectedCalendarIds([])
       showToast('Google Takvim bağlantısı kesildi', 'success', 2000)
     } catch (err) {
       console.error('Error disconnecting Google Calendar:', err)
       showToast('Google Takvim bağlantısı kesilemedi', 'error', 3000)
     }
-  }, [showToast])
+  }, [user, showToast])
 
   const fetchEvents = useCallback(async (date: Date, showLoading = false) => {
     if (!isAuthenticated || !user) return
