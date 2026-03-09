@@ -7,13 +7,12 @@ import {
   getHoldings, createHolding, updateHolding, deleteHolding,
   fetchAssetPrices, enrichHolding,
   formatTl, kurusToTl, tlToKurus,
-  ASSET_LABELS, GOLD_SUBTYPE_LABELS,
+  GOLD_SUBTYPE_LABELS,
   type AssetHolding, type AssetHoldingEnriched, type AssetPrices,
   type AssetType, type GoldSubtype,
 } from '../services/assets.service'
 import { AssetCalculator } from './AssetCalculator'
 
-// ── Form state ────────────────────────────────────────────────
 interface FormState {
   type: AssetType
   subtype: GoldSubtype
@@ -37,18 +36,17 @@ const DEFAULT_FORM: FormState = {
 }
 
 const TYPE_OPTIONS: { value: AssetType; label: string; emoji: string }[] = [
-  { value: 'gold',     label: 'Altın',   emoji: '🥇' },
-  { value: 'silver',   label: 'Gümüş',   emoji: '🥈' },
-  { value: 'platinum', label: 'Platin',  emoji: '🔵' },
-  { value: 'currency', label: 'Döviz',   emoji: '💵' },
+  { value: 'gold',     label: 'Altın',  emoji: '🥇' },
+  { value: 'silver',   label: 'Gümüş',  emoji: '🥈' },
+  { value: 'platinum', label: 'Platin', emoji: '🔵' },
+  { value: 'currency', label: 'Döviz',  emoji: '💵' },
 ]
 
 const GOLD_SUBTYPES: GoldSubtype[] = ['gram', 'quarter', 'half', 'full', 'ata', 'republic']
 const CURRENCY_CODES = ['USD', 'EUR', 'GBP', 'CHF']
 
-// ── Yardımcı ─────────────────────────────────────────────────
 function assetLabel(h: AssetHolding): string {
-  if (h.type === 'gold' && h.subtype) return ASSET_LABELS[`gold_${h.subtype}`] ?? 'Altın'
+  if (h.type === 'gold' && h.subtype) return GOLD_SUBTYPE_LABELS[h.subtype] + ' Altın'
   if (h.type === 'silver') return 'Gram Gümüş'
   if (h.type === 'platinum') return 'Platin'
   if (h.type === 'currency') return h.currency_code ?? 'Döviz'
@@ -59,7 +57,15 @@ function assetEmoji(type: AssetType): string {
   return TYPE_OPTIONS.find(t => t.value === type)?.emoji ?? '💰'
 }
 
-// ══════════════════════════════════════════════════════════════
+// Form'daki seçime göre asset_key üret
+function formAssetKey(form: FormState): string {
+  if (form.type === 'gold') return `gold_${form.subtype}`
+  if (form.type === 'silver') return 'silver_gram'
+  if (form.type === 'platinum') return 'silver_gram'
+  if (form.type === 'currency') return `${form.currency_code.toLowerCase()}_try`
+  return ''
+}
+
 export function AssetsSection() {
   const { user } = useAuth()
   const [holdings, setHoldings] = useState<AssetHolding[]>([])
@@ -69,13 +75,10 @@ export function AssetsSection() {
   const [error, setError] = useState<string | null>(null)
   const [activeView, setActiveView] = useState<'portfolio' | 'calculator'>('portfolio')
 
-  // Form
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState<FormState>(DEFAULT_FORM)
   const [submitting, setSubmitting] = useState(false)
-
-  // Delete confirm
   const [deletingId, setDeletingId] = useState<string | null>(null)
 
   const loadHoldings = useCallback(async () => {
@@ -109,16 +112,18 @@ export function AssetsSection() {
     init()
   }, [loadHoldings, loadPrices])
 
-  // Enriched holdings
   const enriched: AssetHoldingEnriched[] = holdings.map(h => enrichHolding(h, prices))
-
-  // Portföy toplamları
   const totalCurrentTry = enriched.reduce((s, h) => s + h.current_value_try, 0)
   const totalPurchaseTry = enriched.reduce((s, h) => s + h.purchase_value_try, 0)
   const totalProfitTry = totalCurrentTry - totalPurchaseTry
   const totalProfitPct = totalPurchaseTry === 0 ? 0 : (totalProfitTry / totalPurchaseTry) * 100
 
-  // ── Form handlers ─────────────────────────────────────────
+  // Form'daki seçime göre anlık fiyat
+  const formPriceTl = prices[formAssetKey(form)]?.price_tl ?? 0
+  const formPricePlaceholder = formPriceTl > 0
+    ? formPriceTl.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    : '0,00'
+
   function openCreate() {
     setForm(DEFAULT_FORM)
     setEditingId(null)
@@ -164,7 +169,6 @@ export function AssetsSection() {
         label: form.label || null,
         note: form.note || null,
       }
-
       if (editingId) {
         const updated = await updateHolding(editingId, payload)
         setHoldings(prev => prev.map(h => h.id === editingId ? updated : h))
@@ -190,7 +194,6 @@ export function AssetsSection() {
     }
   }
 
-  // ── Render ────────────────────────────────────────────────
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20 text-text-tertiary">
@@ -234,18 +237,18 @@ export function AssetsSection() {
         {activeView === 'portfolio' ? (
           <motion.div key="portfolio" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -5 }} transition={{ duration: 0.2 }} className="space-y-5">
 
-            {/* Özet kartı */}
+            {/* Özet */}
             {enriched.length > 0 && (
               <div className="grid grid-cols-3 gap-3">
-                <div className="bg-background-elevated border border-white/5 rounded-2xl p-4">
+                <div className="bg-background-elevated rounded-2xl p-4">
                   <p className="text-text-tertiary text-xs mb-1">Toplam Değer</p>
                   <p className="text-white font-semibold text-lg">{formatTl(totalCurrentTry)}</p>
                 </div>
-                <div className="bg-background-elevated border border-white/5 rounded-2xl p-4">
+                <div className="bg-background-elevated rounded-2xl p-4">
                   <p className="text-text-tertiary text-xs mb-1">Toplam Maliyet</p>
                   <p className="text-white font-semibold text-lg">{formatTl(totalPurchaseTry)}</p>
                 </div>
-                <div className={`border rounded-2xl p-4 ${totalProfitTry >= 0 ? 'bg-success/10 border-success/20' : 'bg-danger/10 border-danger/20'}`}>
+                <div className={`rounded-2xl p-4 ${totalProfitTry >= 0 ? 'bg-success/10' : 'bg-danger/10'}`}>
                   <p className="text-text-tertiary text-xs mb-1">Kar / Zarar</p>
                   <p className={`font-semibold text-lg ${totalProfitTry >= 0 ? 'text-success' : 'text-danger'}`}>
                     {totalProfitTry >= 0 ? '+' : ''}{formatTl(totalProfitTry)}
@@ -264,14 +267,14 @@ export function AssetsSection() {
                 <button
                   onClick={() => loadPrices(true)}
                   disabled={pricesLoading}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-text-secondary hover:text-white border border-white/10 hover:border-white/20 transition-all"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-text-secondary hover:text-white transition-all"
                 >
                   <RefreshCw className={`w-3 h-3 ${pricesLoading ? 'animate-spin' : ''}`} />
                   Fiyatları Güncelle
                 </button>
                 <button
                   onClick={openCreate}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-white bg-primary/80 hover:bg-primary border border-primary/30 transition-all"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-white bg-primary/80 hover:bg-primary transition-all"
                 >
                   <Plus className="w-3 h-3" />
                   Varlık Ekle
@@ -292,21 +295,18 @@ export function AssetsSection() {
             ) : (
               <div className="space-y-3">
                 <AnimatePresence>
-                  {enriched.map((h) => (
+                  {enriched.map(h => (
                     <motion.div
                       key={h.id}
                       initial={{ opacity: 0, y: 6 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, scale: 0.97 }}
-                      className="bg-background-elevated border border-white/5 rounded-2xl p-4 hover:border-white/10 transition-all"
+                      className="bg-background-elevated rounded-2xl p-4 transition-all"
                     >
                       <div className="flex items-start gap-3">
-                        {/* Emoji */}
                         <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center text-xl flex-shrink-0">
                           {assetEmoji(h.type)}
                         </div>
-
-                        {/* Bilgi */}
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className="text-white font-medium text-sm">{h.label || assetLabel(h)}</span>
@@ -319,8 +319,6 @@ export function AssetsSection() {
                           </div>
                           {h.note && <p className="text-text-tertiary text-xs mt-1 italic truncate">{h.note}</p>}
                         </div>
-
-                        {/* Değerler */}
                         <div className="text-right flex-shrink-0">
                           <p className="text-white font-semibold text-sm">{formatTl(h.current_value_try)}</p>
                           <div className={`flex items-center justify-end gap-1 text-xs mt-0.5 ${h.profit_loss_try >= 0 ? 'text-success' : 'text-danger'}`}>
@@ -330,8 +328,6 @@ export function AssetsSection() {
                           </div>
                           <p className="text-text-tertiary text-[10px] mt-0.5">Güncel: {formatTl(h.current_price_try)}/birim</p>
                         </div>
-
-                        {/* Aksiyonlar */}
                         <div className="flex items-center gap-1 ml-1">
                           <button onClick={() => openEdit(h)} className="p-1.5 rounded-lg text-text-tertiary hover:text-white hover:bg-white/5 transition-all">
                             <Pencil className="w-3.5 h-3.5" />
@@ -372,11 +368,11 @@ export function AssetsSection() {
             <motion.div
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-              onClick={(e) => e.target === e.currentTarget && closeForm()}
+              onClick={e => e.target === e.currentTarget && closeForm()}
             >
               <motion.div
                 initial={{ opacity: 0, scale: 0.95, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95 }}
-                className="bg-background-elevated border border-white/10 rounded-2xl p-6 w-full max-w-md shadow-2xl"
+                className="bg-background-elevated rounded-2xl p-6 w-full max-w-md shadow-2xl"
               >
                 <div className="flex items-center justify-between mb-5">
                   <h3 className="text-white font-semibold">{editingId ? 'Varlığı Düzenle' : 'Varlık Ekle'}</h3>
@@ -394,8 +390,8 @@ export function AssetsSection() {
                         <button
                           key={o.value}
                           onClick={() => setForm(f => ({ ...f, type: o.value }))}
-                          className={`flex flex-col items-center gap-1 py-2 rounded-xl border text-xs transition-all
-                            ${form.type === o.value ? 'bg-primary/20 border-primary/40 text-white' : 'border-white/10 text-text-tertiary hover:border-white/20 hover:text-white'}`}
+                          className={`flex flex-col items-center gap-1 py-2 rounded-xl text-xs transition-all
+                            ${form.type === o.value ? 'bg-primary/20 text-white ring-1 ring-primary/40' : 'bg-white/5 text-text-tertiary hover:bg-white/8 hover:text-white'}`}
                         >
                           <span className="text-lg">{o.emoji}</span>
                           {o.label}
@@ -409,16 +405,25 @@ export function AssetsSection() {
                     <div>
                       <label className="text-text-secondary text-xs mb-2 block">Altın Tipi</label>
                       <div className="grid grid-cols-3 gap-2">
-                        {GOLD_SUBTYPES.map(s => (
-                          <button
-                            key={s}
-                            onClick={() => setForm(f => ({ ...f, subtype: s }))}
-                            className={`py-1.5 rounded-lg border text-xs transition-all
-                              ${form.subtype === s ? 'bg-primary/20 border-primary/40 text-white' : 'border-white/10 text-text-tertiary hover:border-white/20 hover:text-white'}`}
-                          >
-                            {GOLD_SUBTYPE_LABELS[s]}
-                          </button>
-                        ))}
+                        {GOLD_SUBTYPES.map(s => {
+                          const key = `gold_${s}`
+                          const price = prices[key]?.price_tl
+                          return (
+                            <button
+                              key={s}
+                              onClick={() => setForm(f => ({ ...f, subtype: s }))}
+                              className={`py-2 px-2 rounded-lg text-xs transition-all text-left
+                                ${form.subtype === s ? 'bg-primary/20 text-white ring-1 ring-primary/40' : 'bg-white/5 text-text-tertiary hover:bg-white/8 hover:text-white'}`}
+                            >
+                              <div className="font-medium">{GOLD_SUBTYPE_LABELS[s]}</div>
+                              {price ? (
+                                <div className={`text-[10px] mt-0.5 ${form.subtype === s ? 'text-primary/80' : 'text-text-tertiary'}`}>
+                                  {price.toLocaleString('tr-TR', { maximumFractionDigits: 0 })} ₺
+                                </div>
+                              ) : null}
+                            </button>
+                          )
+                        })}
                       </div>
                     </div>
                   )}
@@ -432,13 +437,23 @@ export function AssetsSection() {
                           <button
                             key={c}
                             onClick={() => setForm(f => ({ ...f, currency_code: c }))}
-                            className={`py-1.5 rounded-lg border text-xs transition-all
-                              ${form.currency_code === c ? 'bg-primary/20 border-primary/40 text-white' : 'border-white/10 text-text-tertiary hover:border-white/20 hover:text-white'}`}
+                            className={`py-1.5 rounded-lg text-xs transition-all
+                              ${form.currency_code === c ? 'bg-primary/20 text-white ring-1 ring-primary/40' : 'bg-white/5 text-text-tertiary hover:bg-white/8 hover:text-white'}`}
                           >
                             {c}
                           </button>
                         ))}
                       </div>
+                    </div>
+                  )}
+
+                  {/* Güncel fiyat göster */}
+                  {formPriceTl > 0 && (
+                    <div className="flex items-center gap-2 px-3 py-2 bg-primary/8 rounded-xl">
+                      <span className="text-[10px] bg-emerald-500/15 text-emerald-400 rounded px-1.5 py-0.5">Canlı</span>
+                      <span className="text-text-secondary text-xs">
+                        Güncel fiyat: <span className="text-white font-medium">{formPriceTl.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺</span>
+                      </span>
                     </div>
                   )}
 
@@ -453,7 +468,7 @@ export function AssetsSection() {
                         value={form.quantity}
                         onChange={e => setForm(f => ({ ...f, quantity: e.target.value }))}
                         placeholder="0"
-                        className="w-full bg-background border border-white/10 rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-primary/50"
+                        className="w-full bg-background rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-primary/50"
                       />
                     </div>
                     <div>
@@ -462,8 +477,8 @@ export function AssetsSection() {
                         type="number" min="0" step="any"
                         value={form.purchase_price}
                         onChange={e => setForm(f => ({ ...f, purchase_price: e.target.value }))}
-                        placeholder="0,00"
-                        className="w-full bg-background border border-white/10 rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-primary/50"
+                        placeholder={formPricePlaceholder}
+                        className="w-full bg-background rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-primary/50 placeholder:text-text-tertiary/60"
                       />
                     </div>
                   </div>
@@ -475,7 +490,7 @@ export function AssetsSection() {
                       type="date"
                       value={form.purchase_date}
                       onChange={e => setForm(f => ({ ...f, purchase_date: e.target.value }))}
-                      className="w-full bg-background border border-white/10 rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-primary/50"
+                      className="w-full bg-background rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-primary/50"
                     />
                   </div>
 
@@ -487,7 +502,7 @@ export function AssetsSection() {
                       value={form.label}
                       onChange={e => setForm(f => ({ ...f, label: e.target.value }))}
                       placeholder="ör. Düğün altınları"
-                      className="w-full bg-background border border-white/10 rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-primary/50"
+                      className="w-full bg-background rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-primary/50"
                     />
                   </div>
 
@@ -499,13 +514,12 @@ export function AssetsSection() {
                       onChange={e => setForm(f => ({ ...f, note: e.target.value }))}
                       placeholder="Notunuz…"
                       rows={2}
-                      className="w-full bg-background border border-white/10 rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-primary/50 resize-none"
+                      className="w-full bg-background rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-primary/50 resize-none"
                     />
                   </div>
 
-                  {/* Buttons */}
                   <div className="flex gap-2 pt-1">
-                    <button onClick={closeForm} className="flex-1 py-2 rounded-xl border border-white/10 text-text-secondary hover:text-white text-sm transition-all">
+                    <button onClick={closeForm} className="flex-1 py-2 rounded-xl bg-white/5 text-text-secondary hover:text-white text-sm transition-all">
                       İptal
                     </button>
                     <button

@@ -44,34 +44,31 @@ export function FinancePage() {
             )}
 
             {/* Tab Navigation */}
-            <div className="flex w-full gap-1 p-1 bg-background-elevated/50 backdrop-blur-sm border border-white/5 rounded-2xl">
-                {TABS.map(({ id, label, Icon }) => (
-                    <button
-                        key={id}
-                        onClick={() => setActiveTab(id)}
-                        className={`
-              relative flex-1 sm:flex-none flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 py-2 sm:px-4 sm:py-2.5 rounded-xl transition-all duration-200
-              ${activeTab === id ? 'text-white' : 'text-text-tertiary hover:text-text-primary'}
-            `}
-                    >
-                        {activeTab === id && (
-                            <motion.div
-                                layoutId="financeTabBg"
-                                className="absolute inset-0 bg-primary/20 border border-primary/20 rounded-xl"
-                                transition={{ type: 'spring', bounce: 0.2, duration: 0.5 }}
-                            />
-                        )}
-                        <Icon className="w-5 h-5 sm:w-4 sm:h-4 relative z-10" />
-                        <span className="relative z-10 text-[9px] sm:text-sm font-medium leading-tight text-center sm:whitespace-nowrap line-clamp-2 md:line-clamp-none px-0.5">
-                            {label === 'Borç & Alacak' ? (
-                                <>
-                                    <span className="block sm:inline">Borç &</span>
-                                    <span className="block sm:inline">Alacak</span>
-                                </>
-                            ) : label}
-                        </span>
-                    </button>
-                ))}
+            <div className="w-full overflow-x-auto scrollbar-hide p-1 bg-background-elevated/50 backdrop-blur-sm border border-white/5 rounded-2xl">
+                <div className="flex gap-1 sm:w-full min-w-max sm:min-w-0">
+                    {TABS.map(({ id, label, Icon }) => (
+                        <button
+                            key={id}
+                            onClick={() => setActiveTab(id)}
+                            className={`
+                  relative flex-shrink-0 sm:flex-1 flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 px-3 py-2 sm:px-4 sm:py-2.5 rounded-xl transition-all duration-200
+                  ${activeTab === id ? 'text-white' : 'text-text-tertiary hover:text-text-primary'}
+                `}
+                        >
+                            {activeTab === id && (
+                                <motion.div
+                                    layoutId="financeTabBg"
+                                    className="absolute inset-0 bg-primary/20 border border-primary/20 rounded-xl"
+                                    transition={{ type: 'spring', bounce: 0.2, duration: 0.5 }}
+                                />
+                            )}
+                            <Icon className="w-5 h-5 sm:w-4 sm:h-4 relative z-10" />
+                            <span className="relative z-10 text-[10px] sm:text-sm font-medium leading-tight text-center whitespace-nowrap px-0.5">
+                                {label}
+                            </span>
+                        </button>
+                    ))}
+                </div>
             </div>
 
             {/* Tab Content */}
