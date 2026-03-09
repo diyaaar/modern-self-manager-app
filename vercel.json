@@ -6,10 +6,6 @@
   "framework": "vite",
   "rewrites": [
     {
-      "source": "/api/calendar/:path*",
-      "destination": "/api/calendar/[...slug]"
-    },
-    {
       "source": "/((?!api/).*)",
       "destination": "/index.html"
     }
