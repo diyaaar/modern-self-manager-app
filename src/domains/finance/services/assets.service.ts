@@ -63,7 +63,7 @@ export const ASSET_KEY_MAP: Record<AssetType, (subtype?: GoldSubtype | null, cur
     return map[subtype ?? 'gram'] ?? 'gold_gram'
   },
   silver: () => 'silver_gram',
-  platinum: () => 'platinum',
+  platinum: () => 'silver_gram', // no dedicated API, uses silver as proxy for existing holdings
   currency: (_, code) => `${(code ?? 'usd').toLowerCase()}_try`,
 }
 
@@ -79,7 +79,6 @@ export const ASSET_LABELS: Record<string, string> = {
   gold_ata: 'Ata Altın',
   gold_republic: 'Cumhuriyet Altını',
   silver_gram: 'Gram Gümüş',
-  platinum: 'Platin',
   usd_try: 'USD/TRY',
   eur_try: 'EUR/TRY',
   gbp_try: 'GBP/TRY',

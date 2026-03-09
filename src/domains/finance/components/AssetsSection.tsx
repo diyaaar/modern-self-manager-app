@@ -39,7 +39,6 @@ const DEFAULT_FORM: FormState = {
 const TYPE_OPTIONS: { value: AssetType; label: string; emoji: string }[] = [
   { value: 'gold', label: 'Altın', emoji: '🥇' },
   { value: 'silver', label: 'Gümüş', emoji: '🥈' },
-  { value: 'platinum', label: 'Platin', emoji: '💎' },
   { value: 'currency', label: 'Döviz', emoji: '💵' },
 ]
 
@@ -459,7 +458,6 @@ export function AssetsSection() {
                           let keys: string[] = []
                           if (form.type === 'gold') keys = GOLD_SUBTYPES.map(s => `gold_${s}`)
                           else if (form.type === 'silver') keys = ['silver_gram']
-                          else if (form.type === 'platinum') keys = ['platinum']
                           else keys = CURRENCY_CODES.map(c => `${c.toLowerCase()}_try`)
                           return keys.map(k => {
                             const p = prices[k]?.price_tl

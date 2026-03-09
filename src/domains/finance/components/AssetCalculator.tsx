@@ -6,8 +6,8 @@ import {
 } from 'recharts'
 import { formatTl, CURRENCY_LABELS, GOLD_SUBTYPE_LABELS, type AssetPrices } from '../services/assets.service'
 
-type AssetKey = 'gold_gram' | 'gold_quarter' | 'gold_half' | 'gold_full' | 'gold_ata' | 'gold_republic' | 'silver_gram' | 'platinum' | 'usd_try' | 'eur_try' | 'gbp_try' | 'chf_try'
-type AssetCategory = 'gold' | 'silver' | 'platinum' | 'currency'
+type AssetKey = 'gold_gram' | 'gold_quarter' | 'gold_half' | 'gold_full' | 'gold_ata' | 'gold_republic' | 'silver_gram' | 'usd_try' | 'eur_try' | 'gbp_try' | 'chf_try'
+type AssetCategory = 'gold' | 'silver' | 'currency'
 type Frequency = 'daily' | 'weekly' | 'monthly'
 type Duration = 1 | 3 | 5 | 10
 
@@ -18,7 +18,6 @@ interface Props {
 const CATEGORY_OPTIONS: { key: AssetCategory; label: string; emoji: string }[] = [
   { key: 'gold', label: 'Altın', emoji: '🥇' },
   { key: 'silver', label: 'Gümüş', emoji: '🥈' },
-  { key: 'platinum', label: 'Platin', emoji: '💎' },
   { key: 'currency', label: 'Döviz', emoji: '💵' },
 ]
 
@@ -41,7 +40,7 @@ const CURRENCY_KEYS: { key: AssetKey; code: string }[] = [
 const ASSET_KEY_TO_LABEL: Record<AssetKey, string> = {
   gold_gram: 'Gram Altın', gold_quarter: 'Çeyrek Altın', gold_half: 'Yarım Altın',
   gold_full: 'Tam Altın', gold_ata: 'Ata Altın', gold_republic: 'Cumhuriyet Altını',
-  silver_gram: 'Gram Gümüş', platinum: 'Platin',
+  silver_gram: 'Gram Gümüş',
   usd_try: 'USD/TRY', eur_try: 'EUR/TRY', gbp_try: 'GBP/TRY', chf_try: 'CHF/TRY',
 }
 
@@ -148,7 +147,6 @@ export function AssetCalculator({ prices }: Props) {
     setCustomPrice('')
     if (cat === 'gold') setAssetKey('gold_gram')
     else if (cat === 'silver') setAssetKey('silver_gram')
-    else if (cat === 'platinum') setAssetKey('platinum')
     else if (cat === 'currency') setAssetKey('usd_try')
   }
 
@@ -335,7 +333,6 @@ export function AssetCalculator({ prices }: Props) {
               let keys: string[] = []
               if (category === 'gold') keys = GOLD_SUBTYPE_KEYS.map(g => g.key)
               else if (category === 'silver') keys = ['silver_gram']
-              else if (category === 'platinum') keys = ['platinum']
               else keys = CURRENCY_KEYS.map(c => c.key)
               return keys.map(k => {
                 const p = prices[k]?.price_tl

@@ -23,25 +23,36 @@ async function fetchGoldPrices(): Promise<Record<string, number>> {
   const data = await res.json()
   if (!data.success || !Array.isArray(data.result)) throw new Error('CollectAPI goldPrice unexpected format')
 
-  // name → asset_key mapping
+  // name → asset_key mapping (CollectAPI'nin döndürdüğü isimler değişebilir)
   const nameMap: Record<string, string> = {
     'Gram Altın': 'gold_gram',
     'Çeyrek Altın': 'gold_quarter',
     'Yarım Altın': 'gold_half',
     'Tam Altın': 'gold_full',
     'Ata Altın': 'gold_ata',
+    'Ata Altını': 'gold_ata',
     'Cumhuriyet': 'gold_republic',
+    'Cumhuriyet Altını': 'gold_republic',
+    'Cumhuriyet Altınları': 'gold_republic',
   }
 
   const prices: Record<string, number> = {}
+  const unmatchedNames: string[] = []
   for (const item of data.result) {
     const key = nameMap[item.name]
-    if (!key) continue
-    const buyPrice = parseFloat(item.buy)
-    if (!isNaN(buyPrice)) {
-      // TL cinsinden kuruşa çevir
+    if (!key) {
+      if (item.name !== 'ONS' && item.name !== '14 Ayar Altın' && item.name !== '18 Ayar Altın' && item.name !== '22 Ayar Bilezik') {
+        unmatchedNames.push(item.name)
+      }
+      continue
+    }
+    const buyPrice = parseFloat(item.buy ?? item.buying)
+    if (!isNaN(buyPrice) && buyPrice > 0) {
       prices[key] = Math.round(buyPrice * 100)
     }
+  }
+  if (unmatchedNames.length > 0) {
+    console.log('[asset-prices] Unmatched goldPrice names:', unmatchedNames)
   }
   return prices
 }
@@ -117,7 +128,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     const force = req.query.force === 'true'
-    const ASSET_KEYS = ['gold_gram', 'gold_quarter', 'gold_half', 'gold_full', 'gold_ata', 'gold_republic', 'silver_gram', 'platinum', 'usd_try', 'eur_try', 'gbp_try', 'chf_try']
+    const ASSET_KEYS = ['gold_gram', 'gold_quarter', 'gold_half', 'gold_full', 'gold_ata', 'gold_republic', 'silver_gram', 'usd_try', 'eur_try', 'gbp_try', 'chf_try']
     const prices: Record<string, number> = {}
     const missing: string[] = []
 
@@ -150,11 +161,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const silverPrice = await fetchSilverPrice()
         prices['silver_gram'] = silverPrice
         await setCachedPrice(supabase, 'silver_gram', silverPrice, 'collectapi')
-        // Platinum uses silver price as proxy
-        if (missing.includes('platinum')) {
-          prices['platinum'] = silverPrice
-          await setCachedPrice(supabase, 'platinum', silverPrice, 'collectapi')
-        }
       }
 
       // Döviz kurları
