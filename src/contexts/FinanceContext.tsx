@@ -94,7 +94,7 @@ interface FinanceContextType {
         deadline?: string
         reminder_days?: number
     }) => Promise<FinanceObligation | null>
-    updateObligation: (id: string, updates: Partial<Pick<FinanceObligation, 'description' | 'counterparty' | 'deadline' | 'reminder_days'>>) => Promise<void>
+    updateObligation: (id: string, updates: Partial<Pick<FinanceObligation, 'description' | 'counterparty' | 'deadline' | 'reminder_days' | 'total_amount'>>) => Promise<void>
     closeObligation: (id: string) => Promise<void>
     reopenObligation: (id: string) => Promise<void>
     deleteObligation: (id: string) => Promise<void>
@@ -530,7 +530,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
         }
     }, [user, showToast])
 
-    const updateObligation = useCallback(async (id: string, updates: Partial<Pick<FinanceObligation, 'description' | 'counterparty' | 'deadline' | 'reminder_days'>>) => {
+    const updateObligation = useCallback(async (id: string, updates: Partial<Pick<FinanceObligation, 'description' | 'counterparty' | 'deadline' | 'reminder_days' | 'total_amount'>>) => {
         if (!user) return
         const prev = obligations.find((o) => o.id === id)
         setObligations((obs) => obs.map((o) => o.id === id ? { ...o, ...updates } : o))

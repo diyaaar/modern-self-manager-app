@@ -8,7 +8,7 @@ import { useState } from 'react'
 import { Plus, X, Check, CreditCard, HandIcon, Pencil, Undo } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useFinance } from '../../../contexts/FinanceContext'
-import { formatCurrency, formatInputAmountTl } from '../types/finance.types'
+import { formatCurrency, formatInputAmountTl, kurusToTl, tlToKurus } from '../types/finance.types'
 import type { ObligationWithDerived } from '../types/finance.types'
 import { TransactionForm } from './TransactionForm'
 import { Portal } from '../../../components/Portal'
@@ -22,6 +22,7 @@ export function ObligationSection() {
         reopenObligation,
         deleteObligation,
         getObligationDetail,
+        updateTransaction,
     } = useFinance()
 
     const [activeTab, setActiveTab] = useState<'payable' | 'receivable'>('payable')
@@ -44,7 +45,14 @@ export function ObligationSection() {
     const [editDesc, setEditDesc] = useState('')
     const [editDeadline, setEditDeadline] = useState('')
     const [editCounterparty, setEditCounterparty] = useState('')
+    const [editAmount, setEditAmount] = useState('')
     const [editSubmitting, setEditSubmitting] = useState(false)
+
+    // Edit payment state
+    const [editingPaymentId, setEditingPaymentId] = useState<string | null>(null)
+    const [editPaymentAmount, setEditPaymentAmount] = useState('')
+    const [editPaymentDate, setEditPaymentDate] = useState('')
+    const [editPaymentSubmitting, setEditPaymentSubmitting] = useState(false)
 
     const filtered = obligations.filter(
         (o) => o.type === activeTab && (showClosed ? true : !o.is_closed)
@@ -83,6 +91,7 @@ export function ObligationSection() {
         setEditDesc(detail.description)
         setEditDeadline(detail.deadline ?? '')
         setEditCounterparty(detail.counterparty ?? '')
+        setEditAmount(kurusToTl(detail.total_amount).replace('.', ','))
         setShowEditForm(true)
     }
 
@@ -90,16 +99,70 @@ export function ObligationSection() {
         e.preventDefault()
         if (!detail || !editDesc) return
         setEditSubmitting(true)
-        await updateObligation(detail.id, {
+        const newTotalAmount = tlToKurus(editAmount)
+        const updates: any = {
             description: editDesc,
             deadline: editDeadline || undefined,
             counterparty: editCounterparty || undefined,
-        })
+        }
+        if (newTotalAmount > 0 && newTotalAmount !== detail.total_amount) {
+            updates.total_amount = newTotalAmount
+        }
+        await updateObligation(detail.id, updates)
         setEditSubmitting(false)
         setShowEditForm(false)
         // Refresh detail
         const refreshed = await getObligationDetail(detail.id)
         setDetail(refreshed)
+    }
+
+    const handleStartEditPayment = (paymentId: string) => {
+        if (!detail) return
+        const payment = detail.payments.find(p => p.id === paymentId)
+        if (!payment) return
+        setEditingPaymentId(paymentId)
+        setEditPaymentAmount(kurusToTl(payment.amount).replace('.', ','))
+        // Convert occurred_at to date input format (YYYY-MM-DD)
+        setEditPaymentDate(new Date(payment.occurred_at).toISOString().slice(0, 10))
+    }
+
+    const handleCancelEditPayment = () => {
+        setEditingPaymentId(null)
+        setEditPaymentAmount('')
+        setEditPaymentDate('')
+    }
+
+    const handleUpdatePayment = async (paymentId: string) => {
+        if (!detail) return
+        const payment = detail.payments.find(p => p.id === paymentId)
+        if (!payment) return
+
+        const newAmountKurus = tlToKurus(editPaymentAmount)
+        if (newAmountKurus <= 0) return
+
+        setEditPaymentSubmitting(true)
+        try {
+            const updates: any = {}
+            if (newAmountKurus !== payment.amount) {
+                updates.amount = newAmountKurus
+                updates.currency = payment.currency || 'TRY'
+            }
+            const newDateISO = new Date(editPaymentDate + 'T12:00:00').toISOString()
+            if (newDateISO !== payment.occurred_at) {
+                updates.occurred_at = newDateISO
+            }
+            if (Object.keys(updates).length > 0) {
+                await updateTransaction(paymentId, updates)
+            }
+            // Refresh detail to reflect new derived remaining_amount
+            const refreshed = await getObligationDetail(detail.id)
+            setDetail(refreshed)
+            setEditingPaymentId(null)
+        } catch {
+            // Error handled by context
+        } finally {
+            setEditPaymentSubmitting(false)
+        }
     }
 
     return (
@@ -348,6 +411,19 @@ export function ObligationSection() {
                                                                     className="w-full px-3 py-2 bg-background-secondary border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
                                                                 />
                                                             </div>
+                                                            <div>
+                                                                <label className="text-xs text-text-tertiary mb-1 block">Toplam Tutar (₺)</label>
+                                                                <div className="relative">
+                                                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary">₺</span>
+                                                                    <input
+                                                                        type="text"
+                                                                        inputMode="decimal"
+                                                                        value={editAmount}
+                                                                        onChange={(e) => setEditAmount(formatInputAmountTl(e.target.value))}
+                                                                        className="w-full pl-8 pr-4 py-2 bg-background-secondary border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+                                                                    />
+                                                                </div>
+                                                            </div>
                                                             <div className="grid grid-cols-2 gap-3">
                                                                 <div>
                                                                     <label className="text-xs text-text-tertiary mb-1 block">Karşı Taraf</label>
@@ -405,9 +481,67 @@ export function ObligationSection() {
                                                 ) : (
                                                     <div className="space-y-2 max-h-48 overflow-y-auto">
                                                         {detail.payments.map((p) => (
-                                                            <div key={p.id} className="flex justify-between text-sm p-2 bg-background-elevated rounded-lg">
-                                                                <span className="text-text-secondary">{new Date(p.occurred_at).toLocaleDateString('tr-TR')}</span>
-                                                                <span className="text-success font-medium">+{formatCurrency(p.amount)}</span>
+                                                            <div key={p.id} className="p-2 bg-background-elevated rounded-lg">
+                                                                {editingPaymentId === p.id ? (
+                                                                    <div className="space-y-2">
+                                                                        <div className="grid grid-cols-2 gap-2">
+                                                                            <div>
+                                                                                <label className="text-xs text-text-tertiary mb-0.5 block">Tutar (₺)</label>
+                                                                                <div className="relative">
+                                                                                    <span className="absolute left-2 top-1/2 -translate-y-1/2 text-text-tertiary text-xs">₺</span>
+                                                                                    <input
+                                                                                        type="text"
+                                                                                        inputMode="decimal"
+                                                                                        value={editPaymentAmount}
+                                                                                        onChange={(e) => setEditPaymentAmount(formatInputAmountTl(e.target.value))}
+                                                                                        className="w-full pl-6 pr-2 py-1.5 bg-background-secondary border border-white/10 rounded-lg text-white text-xs focus:outline-none focus:ring-2 focus:ring-primary/40"
+                                                                                    />
+                                                                                </div>
+                                                                            </div>
+                                                                            <div>
+                                                                                <label className="text-xs text-text-tertiary mb-0.5 block">Tarih</label>
+                                                                                <input
+                                                                                    type="date"
+                                                                                    value={editPaymentDate}
+                                                                                    onChange={(e) => setEditPaymentDate(e.target.value)}
+                                                                                    className="w-full px-2 py-1.5 bg-background-secondary border border-white/10 rounded-lg text-white text-xs focus:outline-none focus:ring-2 focus:ring-primary/40"
+                                                                                />
+                                                                            </div>
+                                                                        </div>
+                                                                        <div className="flex gap-1.5">
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={handleCancelEditPayment}
+                                                                                className="flex-1 py-1 text-xs text-text-secondary bg-background-secondary rounded border border-white/5"
+                                                                            >
+                                                                                İptal
+                                                                            </button>
+                                                                            <button
+                                                                                type="button"
+                                                                                disabled={editPaymentSubmitting}
+                                                                                onClick={() => handleUpdatePayment(p.id)}
+                                                                                className="flex-1 py-1 text-xs font-medium text-white bg-primary rounded disabled:opacity-60"
+                                                                            >
+                                                                                {editPaymentSubmitting ? '...' : 'Kaydet'}
+                                                                            </button>
+                                                                        </div>
+                                                                    </div>
+                                                                ) : (
+                                                                    <div className="flex items-center justify-between text-sm">
+                                                                        <span className="text-text-secondary">{new Date(p.occurred_at).toLocaleDateString('tr-TR')}</span>
+                                                                        <div className="flex items-center gap-2">
+                                                                            <span className="text-success font-medium">+{formatCurrency(p.amount)}</span>
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => handleStartEditPayment(p.id)}
+                                                                                className="p-1 rounded text-text-tertiary hover:text-white hover:bg-white/10 transition-all"
+                                                                                title="Ödemeyi düzenle"
+                                                                            >
+                                                                                <Pencil className="w-3 h-3" />
+                                                                            </button>
+                                                                        </div>
+                                                                    </div>
+                                                                )}
                                                             </div>
                                                         ))}
                                                     </div>
