@@ -98,11 +98,13 @@ export function TransactionForm({ onClose, onSuccess, presetType, presetObligati
     // Fetch exchange rates on mount (non-blocking)
     useEffect(() => {
         setRatesLoading(true)
-        fetch('/api/finance/exchange-rates')
+        fetch('/api/finance/asset-prices')
             .then((r) => r.json())
             .then((data) => {
-                if (data?.rates?.USD && data?.rates?.EUR) {
-                    setExchangeRates({ USD: data.rates.USD, EUR: data.rates.EUR })
+                const usdPrice = data?.usd_try?.price_tl
+                const eurPrice = data?.eur_try?.price_tl
+                if (usdPrice && eurPrice) {
+                    setExchangeRates({ USD: usdPrice, EUR: eurPrice })
                 }
             })
             .catch(() => { /* silently ignore — form works without rates */ })
