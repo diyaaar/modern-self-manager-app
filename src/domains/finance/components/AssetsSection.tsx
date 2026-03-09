@@ -88,10 +88,10 @@ export function AssetsSection() {
     }
   }, [user])
 
-  const loadPrices = useCallback(async () => {
+  const loadPrices = useCallback(async (force = false) => {
     setPricesLoading(true)
     try {
-      const data = await fetchAssetPrices()
+      const data = await fetchAssetPrices(force)
       setPrices(data)
     } catch (e: any) {
       setError('Fiyatlar alınamadı: ' + e.message)
@@ -262,7 +262,7 @@ export function AssetsSection() {
               <h3 className="text-text-primary font-semibold">Varlıklarım</h3>
               <div className="flex gap-2">
                 <button
-                  onClick={loadPrices}
+                  onClick={() => loadPrices(true)}
                   disabled={pricesLoading}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-text-secondary hover:text-white border border-white/10 hover:border-white/20 transition-all"
                 >

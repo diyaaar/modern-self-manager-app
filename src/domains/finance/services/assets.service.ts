@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js'
+import { getSupabaseClient } from '../../../lib/supabase'
 
 // ── Types ─────────────────────────────────────────────────────
 
@@ -50,10 +50,7 @@ export interface AssetHoldingEnriched extends AssetHolding {
 // ── Helpers ───────────────────────────────────────────────────
 
 function getSupabase() {
-  const url = import.meta.env.VITE_SUPABASE_URL
-  const key = import.meta.env.VITE_SUPABASE_ANON_KEY
-  if (!url || !key) throw new Error('Supabase env vars missing')
-  return createClient(url, key)
+  return getSupabaseClient()
 }
 
 // asset_key mapping — DB/API key'ini belirler

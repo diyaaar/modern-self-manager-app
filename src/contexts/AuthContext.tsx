@@ -66,6 +66,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           fetchAvatar(session.user.id, session.user.user_metadata?.full_name)
         }
         setLoading(false)
+      }).catch(() => {
+        setLoading(false)
       })
 
       // Listen for auth changes
@@ -122,23 +124,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const updateAvatar = async (newAvatarUrl: string | null) => {
     if (!user) return
 
-    try {
-      const supabase = getSupabase()
-      const { error } = await supabase
-        .from('users')
-        .update({ avatar_url: newAvatarUrl })
-        .eq('id', user.id)
+    const supabase = getSupabase()
+    const { error } = await supabase
+      .from('users')
+      .update({ avatar_url: newAvatarUrl })
+      .eq('id', user.id)
 
-      if (error) {
-        console.error('Error updating avatar:', error)
-        throw error
-      }
-
-      setAvatarUrl(newAvatarUrl)
-    } catch (err) {
-      console.error('Error updating avatar:', err)
-      throw err
+    if (error) {
+      console.error('Error updating avatar:', error)
+      throw error
     }
+
+    setAvatarUrl(newAvatarUrl)
   }
 
   const refreshAvatar = async () => {
@@ -165,7 +162,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     // Also sync to auth metadata for consistency
-    await supabase.auth.updateUser({ data: { full_name: trimmed } })
+    const { error: authError } = await supabase.auth.updateUser({ data: { full_name: trimmed } })
+    if (authError) {
+      console.error('Error syncing display name to auth metadata:', authError)
+    }
 
     setDisplayName(trimmed)
   }

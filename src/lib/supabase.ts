@@ -34,7 +34,7 @@ function validateConfig(): Error | null {
 initializationError = validateConfig()
 
 // Only create client if validation passes
-if (!initializationError && supabaseUrl && supabaseAnonKey) {
+if (!initializationError) {
   try {
     supabase = createClient(supabaseUrl, supabaseAnonKey)
   } catch (error) {

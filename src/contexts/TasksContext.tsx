@@ -1007,12 +1007,13 @@ export function TasksProvider({ children }: { children: ReactNode }) {
           if (!a.deadline) return 1
           if (!b.deadline) return -1
           return new Date(a.deadline).getTime() - new Date(b.deadline).getTime()
-        case 'priority':
+        case 'priority': {
           const priorityOrder = { high: 3, medium: 2, low: 1, null: 0 }
           return (
             (priorityOrder[b.priority as keyof typeof priorityOrder] || 0) -
             (priorityOrder[a.priority as keyof typeof priorityOrder] || 0)
           )
+        }
         case 'title':
           return a.title.localeCompare(b.title)
         case 'created':
