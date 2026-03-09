@@ -194,7 +194,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
         } finally {
             if (!isSilent) setLoading(false)
         }
-    }, [user, showToast])
+    }, [user]) // eslint-disable-line react-hooks/exhaustive-deps
 
     useEffect(() => {
         if (!user) {
