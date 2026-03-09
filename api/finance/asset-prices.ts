@@ -25,12 +25,12 @@ async function fetchGoldPrices(): Promise<Record<string, number>> {
 
   // name → asset_key mapping
   const nameMap: Record<string, string> = {
-    'Gram Altın':    'gold_gram',
-    'Çeyrek Altın':  'gold_quarter',
-    'Yarım Altın':   'gold_half',
-    'Tam Altın':     'gold_full',
-    'Ata Altın':     'gold_ata',
-    'Cumhuriyet':    'gold_republic',
+    'Gram Altın': 'gold_gram',
+    'Çeyrek Altın': 'gold_quarter',
+    'Yarım Altın': 'gold_half',
+    'Tam Altın': 'gold_full',
+    'Ata Altın': 'gold_ata',
+    'Cumhuriyet': 'gold_republic',
   }
 
   const prices: Record<string, number> = {}
@@ -63,6 +63,23 @@ async function fetchSilverPrice(): Promise<number> {
   if (isNaN(buying)) throw new Error('CollectAPI silverPrice invalid buying value')
 
   return Math.round(buying * 100) // kuruş
+}
+
+// Frankfurter.app'tan döviz kurlarını çek
+async function fetchCurrencyRates(): Promise<Record<string, number>> {
+  const res = await fetch(
+    'https://api.frankfurter.app/latest?from=TRY&to=USD,EUR,GBP,CHF',
+    { signal: AbortSignal.timeout(5000) }
+  )
+  if (!res.ok) throw new Error(`Frankfurter API error: ${res.status}`)
+  const data = await res.json()
+  const rates: Record<string, number> = {}
+  for (const [code, rate] of Object.entries(data.rates as Record<string, number>)) {
+    // 1 TRY = rate USD → 1 USD = 1/rate TRY → kuruş cinsinden
+    const tlPerUnit = 1 / rate
+    rates[`${code.toLowerCase()}_try`] = Math.round(tlPerUnit * 100)
+  }
+  return rates
 }
 
 // Cache'den oku — force=true ise her zaman null döner (cache atlanır)
@@ -100,7 +117,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     const force = req.query.force === 'true'
-    const ASSET_KEYS = ['gold_gram', 'gold_quarter', 'gold_half', 'gold_full', 'gold_ata', 'gold_republic', 'silver_gram']
+    const ASSET_KEYS = ['gold_gram', 'gold_quarter', 'gold_half', 'gold_full', 'gold_ata', 'gold_republic', 'silver_gram', 'platinum', 'usd_try', 'eur_try', 'gbp_try', 'chf_try']
     const prices: Record<string, number> = {}
     const missing: string[] = []
 
@@ -133,6 +150,27 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const silverPrice = await fetchSilverPrice()
         prices['silver_gram'] = silverPrice
         await setCachedPrice(supabase, 'silver_gram', silverPrice, 'collectapi')
+        // Platinum uses silver price as proxy
+        if (missing.includes('platinum')) {
+          prices['platinum'] = silverPrice
+          await setCachedPrice(supabase, 'platinum', silverPrice, 'collectapi')
+        }
+      }
+
+      // Döviz kurları
+      const currencyKeys = missing.filter(k => k.endsWith('_try'))
+      if (currencyKeys.length > 0) {
+        try {
+          const currencyRates = await fetchCurrencyRates()
+          for (const key of currencyKeys) {
+            if (currencyRates[key] !== undefined) {
+              prices[key] = currencyRates[key]
+              await setCachedPrice(supabase, key, currencyRates[key], 'frankfurter')
+            }
+          }
+        } catch (currErr: any) {
+          console.warn('[asset-prices] Currency fetch failed:', currErr?.message)
+        }
       }
     }
 

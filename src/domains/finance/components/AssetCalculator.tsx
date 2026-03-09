@@ -4,9 +4,10 @@ import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer,
   CartesianGrid, ReferenceLine, ReferenceDot,
 } from 'recharts'
-import { formatTl, type AssetPrices } from '../services/assets.service'
+import { formatTl, CURRENCY_LABELS, GOLD_SUBTYPE_LABELS, type AssetPrices } from '../services/assets.service'
 
-type AssetKey = 'gold_gram' | 'gold_quarter' | 'gold_half' | 'gold_full' | 'gold_ata' | 'gold_republic' | 'silver_gram'
+type AssetKey = 'gold_gram' | 'gold_quarter' | 'gold_half' | 'gold_full' | 'gold_ata' | 'gold_republic' | 'silver_gram' | 'platinum' | 'usd_try' | 'eur_try' | 'gbp_try' | 'chf_try'
+type AssetCategory = 'gold' | 'silver' | 'platinum' | 'currency'
 type Frequency = 'daily' | 'weekly' | 'monthly'
 type Duration = 1 | 3 | 5 | 10
 
@@ -14,20 +15,41 @@ interface Props {
   prices: AssetPrices
 }
 
-const ASSET_OPTIONS: { key: AssetKey; label: string; shortLabel: string; emoji: string }[] = [
-  { key: 'gold_gram',     label: 'Gram Altın',        shortLabel: 'Gram',        emoji: '🥇' },
-  { key: 'gold_quarter',  label: 'Çeyrek Altın',      shortLabel: 'Çeyrek',      emoji: '🥇' },
-  { key: 'gold_half',     label: 'Yarım Altın',       shortLabel: 'Yarım',       emoji: '🥇' },
-  { key: 'gold_full',     label: 'Tam Altın',         shortLabel: 'Tam',         emoji: '🥇' },
-  { key: 'gold_ata',      label: 'Ata Altın',         shortLabel: 'Ata',         emoji: '🥇' },
-  { key: 'gold_republic', label: 'Cumhuriyet Altını', shortLabel: 'Cumhuriyet',  emoji: '🥇' },
-  { key: 'silver_gram',   label: 'Gram Gümüş',        shortLabel: 'Gümüş',       emoji: '🥈' },
+const CATEGORY_OPTIONS: { key: AssetCategory; label: string; emoji: string }[] = [
+  { key: 'gold', label: 'Altın', emoji: '🥇' },
+  { key: 'silver', label: 'Gümüş', emoji: '🥈' },
+  { key: 'platinum', label: 'Platin', emoji: '💎' },
+  { key: 'currency', label: 'Döviz', emoji: '💵' },
 ]
 
+const GOLD_SUBTYPE_KEYS: { key: AssetKey; subtype: string }[] = [
+  { key: 'gold_gram', subtype: 'gram' },
+  { key: 'gold_quarter', subtype: 'quarter' },
+  { key: 'gold_half', subtype: 'half' },
+  { key: 'gold_full', subtype: 'full' },
+  { key: 'gold_ata', subtype: 'ata' },
+  { key: 'gold_republic', subtype: 'republic' },
+]
+
+const CURRENCY_KEYS: { key: AssetKey; code: string }[] = [
+  { key: 'usd_try', code: 'USD' },
+  { key: 'eur_try', code: 'EUR' },
+  { key: 'gbp_try', code: 'GBP' },
+  { key: 'chf_try', code: 'CHF' },
+]
+
+const ASSET_KEY_TO_LABEL: Record<AssetKey, string> = {
+  gold_gram: 'Gram Altın', gold_quarter: 'Çeyrek Altın', gold_half: 'Yarım Altın',
+  gold_full: 'Tam Altın', gold_ata: 'Ata Altın', gold_republic: 'Cumhuriyet Altını',
+  silver_gram: 'Gram Gümüş', platinum: 'Platin',
+  usd_try: 'USD/TRY', eur_try: 'EUR/TRY', gbp_try: 'GBP/TRY', chf_try: 'CHF/TRY',
+}
+
+
 const FREQUENCY_OPTIONS: { value: Frequency; label: string; perYear: number; desc: string }[] = [
-  { value: 'daily',   label: 'Günlük',  perYear: 365, desc: 'Her gün' },
-  { value: 'weekly',  label: 'Haftalık', perYear: 52,  desc: 'Her hafta' },
-  { value: 'monthly', label: 'Aylık',   perYear: 12,  desc: 'Her ay' },
+  { value: 'daily', label: 'Günlük', perYear: 365, desc: 'Her gün' },
+  { value: 'weekly', label: 'Haftalık', perYear: 52, desc: 'Her hafta' },
+  { value: 'monthly', label: 'Aylık', perYear: 12, desc: 'Her ay' },
 ]
 
 const DURATION_OPTIONS: Duration[] = [1, 3, 5, 10]
@@ -71,18 +93,18 @@ function CustomTooltip({ active, payload, label }: any) {
 
 function StatCard({ label, value, sub, accent }: { label: string; value: string; sub?: string; accent?: 'blue' | 'green' | 'red' | 'amber' | 'none' }) {
   const colors = {
-    blue:  'bg-primary/10 border-primary/20',
+    blue: 'bg-primary/10 border-primary/20',
     green: 'bg-emerald-500/10 border-emerald-500/20',
-    red:   'bg-red-500/10 border-red-500/20',
+    red: 'bg-red-500/10 border-red-500/20',
     amber: 'bg-amber-500/10 border-amber-500/20',
-    none:  'bg-white/[0.03] border-white/5',
+    none: 'bg-white/[0.03] border-white/5',
   }
   const textColors = {
-    blue:  'text-primary',
+    blue: 'text-primary',
     green: 'text-emerald-400',
-    red:   'text-red-400',
+    red: 'text-red-400',
     amber: 'text-amber-400',
-    none:  'text-white',
+    none: 'text-white',
   }
   const a = accent ?? 'none'
   return (
@@ -107,7 +129,8 @@ function MilestoneCard({ icon: Icon, label, value, color }: { icon: any; label: 
 }
 
 export function AssetCalculator({ prices }: Props) {
-  const [assetKey, setAssetKey] = useState<AssetKey>('silver_gram')
+  const [assetKey, setAssetKey] = useState<AssetKey>('gold_gram')
+  const [category, setCategory] = useState<AssetCategory>('gold')
   const [frequency, setFrequency] = useState<Frequency>('monthly')
   const [amount, setAmount] = useState('1')
   const [duration, setDuration] = useState<Duration>(1)
@@ -115,10 +138,19 @@ export function AssetCalculator({ prices }: Props) {
   const [annualGrowth, setAnnualGrowth] = useState('8')
   const [customPrice, setCustomPrice] = useState('')
 
-  const selectedAsset = ASSET_OPTIONS.find(o => o.key === assetKey)!
+  const selectedLabel = ASSET_KEY_TO_LABEL[assetKey]
   const livePrice = prices[assetKey]?.price_tl ?? 0
   const currentPriceTl = customPrice && parseFloat(customPrice) > 0 ? parseFloat(customPrice) : livePrice
   const hasLivePrice = livePrice > 0
+
+  function selectCategory(cat: AssetCategory) {
+    setCategory(cat)
+    setCustomPrice('')
+    if (cat === 'gold') setAssetKey('gold_gram')
+    else if (cat === 'silver') setAssetKey('silver_gram')
+    else if (cat === 'platinum') setAssetKey('platinum')
+    else if (cat === 'currency') setAssetKey('usd_try')
+  }
 
   const result = useMemo(() => {
     const qty = parseFloat(amount) || 0
@@ -221,37 +253,101 @@ export function AssetCalculator({ prices }: Props) {
   return (
     <div className="space-y-6">
 
-      {/* Varlık seçici — horizontal scroll */}
+      {/* Kategori seçici */}
       <div>
         <p className="text-text-tertiary text-xs mb-3 uppercase tracking-wider font-medium">Varlık Seçin</p>
-        <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
-          {ASSET_OPTIONS.map(o => {
-            const price = prices[o.key]?.price_tl
-            const isActive = assetKey === o.key
+        <div className="grid grid-cols-4 gap-2">
+          {CATEGORY_OPTIONS.map(o => {
+            const isActive = category === o.key
             return (
               <button
                 key={o.key}
-                onClick={() => { setAssetKey(o.key); setCustomPrice('') }}
-                className={`flex-shrink-0 flex flex-col items-start gap-1 px-3.5 py-2.5 rounded-xl border text-left transition-all duration-200
+                onClick={() => selectCategory(o.key)}
+                className={`flex flex-col items-center gap-1 py-2.5 rounded-xl border text-xs font-medium transition-all duration-200
                   ${isActive
-                    ? 'bg-primary/15 border-primary/40 shadow-[0_0_0_1px_rgba(99,102,241,0.2)]'
-                    : 'bg-white/[0.02] border-white/[0.08] hover:border-white/15 hover:bg-white/[0.04]'
+                    ? 'bg-primary/15 border-primary/40 text-white shadow-[0_0_0_1px_rgba(99,102,241,0.2)]'
+                    : 'bg-white/[0.02] border-white/[0.08] text-text-tertiary hover:border-white/15 hover:text-white'
                   }`}
               >
-                <span className="text-base leading-none">{o.emoji}</span>
-                <span className={`text-xs font-medium whitespace-nowrap ${isActive ? 'text-white' : 'text-text-secondary'}`}>
-                  {o.shortLabel}
-                </span>
-                {price ? (
-                  <span className={`text-[10px] whitespace-nowrap ${isActive ? 'text-primary/80' : 'text-text-tertiary'}`}>
-                    {price.toLocaleString('tr-TR', { maximumFractionDigits: 0 })} ₺
-                  </span>
-                ) : (
-                  <span className="text-[10px] text-text-tertiary/40">—</span>
-                )}
+                <span className="text-lg leading-none">{o.emoji}</span>
+                {o.label}
               </button>
             )
           })}
+        </div>
+
+        {/* Altın alt-türleri */}
+        {category === 'gold' && (
+          <div className="mt-3">
+            <div className="grid grid-cols-3 gap-2">
+              {GOLD_SUBTYPE_KEYS.map(g => {
+                const isActive = assetKey === g.key
+                const price = prices[g.key]?.price_tl
+                return (
+                  <button
+                    key={g.key}
+                    onClick={() => { setAssetKey(g.key); setCustomPrice('') }}
+                    className={`py-2 px-2 rounded-lg text-xs transition-all text-left
+                      ${isActive ? 'bg-primary/20 text-white ring-1 ring-primary/40' : 'bg-white/5 text-text-tertiary hover:bg-white/8 hover:text-white'}`}
+                  >
+                    <div className="font-medium">{GOLD_SUBTYPE_LABELS[g.subtype as keyof typeof GOLD_SUBTYPE_LABELS]}</div>
+                    {price ? (
+                      <div className={`text-[10px] mt-0.5 ${isActive ? 'text-primary/80' : 'text-text-tertiary'}`}>
+                        {price.toLocaleString('tr-TR', { maximumFractionDigits: 0 })} ₺
+                      </div>
+                    ) : null}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Döviz seçici */}
+        {category === 'currency' && (
+          <div className="mt-3 space-y-2">
+            <div className="grid grid-cols-4 gap-2">
+              {CURRENCY_KEYS.map(c => {
+                const isActive = assetKey === c.key
+                return (
+                  <button
+                    key={c.key}
+                    onClick={() => { setAssetKey(c.key); setCustomPrice('') }}
+                    className={`py-1.5 rounded-lg text-xs transition-all
+                      ${isActive ? 'bg-primary/20 text-white ring-1 ring-primary/40' : 'bg-white/5 text-text-tertiary hover:bg-white/8 hover:text-white'}`}
+                  >
+                    {c.code}
+                  </button>
+                )
+              })}
+            </div>
+            <p className="text-text-tertiary text-[11px] pl-0.5">
+              {CURRENCY_LABELS[CURRENCY_KEYS.find(c => c.key === assetKey)?.code ?? 'USD']}
+            </p>
+          </div>
+        )}
+
+        {/* Güncel fiyatlar özeti */}
+        <div className="mt-3 px-3 py-2.5 bg-white/[0.02] border border-white/[0.06] rounded-xl">
+          <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px]">
+            {(() => {
+              // Kategoriye göre ilgili fiyatları göster
+              let keys: string[] = []
+              if (category === 'gold') keys = GOLD_SUBTYPE_KEYS.map(g => g.key)
+              else if (category === 'silver') keys = ['silver_gram']
+              else if (category === 'platinum') keys = ['platinum']
+              else keys = CURRENCY_KEYS.map(c => c.key)
+              return keys.map(k => {
+                const p = prices[k]?.price_tl
+                return (
+                  <span key={k} className="text-text-tertiary">
+                    {ASSET_KEY_TO_LABEL[k as AssetKey]}: {p ? <span className="text-white font-medium">{p.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺</span> : <span className="text-text-tertiary/40">—</span>}
+                  </span>
+                )
+              })
+            })()}
+          </div>
+          <p className="text-text-tertiary/50 text-[10px] mt-1.5">Fiyatları güncellemek için portföy sekmesinden 'Güncelle' butonuna basınız</p>
         </div>
       </div>
 
@@ -264,7 +360,7 @@ export function AssetCalculator({ prices }: Props) {
           {/* Fiyat */}
           <div className="bg-white/[0.02] border border-white/[0.08] rounded-2xl p-4 space-y-1">
             <div className="flex items-center justify-between mb-2">
-              <p className="text-text-secondary text-xs font-medium">{selectedAsset.label} — Birim Fiyat</p>
+              <p className="text-text-secondary text-xs font-medium">{selectedLabel} — Birim Fiyat</p>
               {hasLivePrice && !customPrice && (
                 <span className="text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-md px-1.5 py-0.5">
                   Canlı
@@ -420,7 +516,7 @@ export function AssetCalculator({ prices }: Props) {
                     <MilestoneCard
                       icon={Trophy}
                       label="Birikim hedefi"
-                      value={`${result.kgCount} kg ${selectedAsset.label} birikiyor! 🎉`}
+                      value={`${result.kgCount} kg ${selectedLabel} birikiyor! 🎉`}
                       color="border-amber-500/20 bg-amber-500/5"
                     />
                   )}

@@ -8,6 +8,7 @@ import {
   fetchAssetPrices, enrichHolding,
   formatTl, kurusToTl, tlToKurus,
   GOLD_SUBTYPE_LABELS,
+  CURRENCY_LABELS,
   type AssetHolding, type AssetHoldingEnriched, type AssetPrices,
   type AssetType, type GoldSubtype,
 } from '../services/assets.service'
@@ -36,10 +37,10 @@ const DEFAULT_FORM: FormState = {
 }
 
 const TYPE_OPTIONS: { value: AssetType; label: string; emoji: string }[] = [
-  { value: 'gold',     label: 'Altın',  emoji: '🥇' },
-  { value: 'silver',   label: 'Gümüş',  emoji: '🥈' },
-  { value: 'platinum', label: 'Platin', emoji: '🔵' },
-  { value: 'currency', label: 'Döviz',  emoji: '💵' },
+  { value: 'gold', label: 'Altın', emoji: '🥇' },
+  { value: 'silver', label: 'Gümüş', emoji: '🥈' },
+  { value: 'platinum', label: 'Platin', emoji: '💎' },
+  { value: 'currency', label: 'Döviz', emoji: '💵' },
 ]
 
 const GOLD_SUBTYPES: GoldSubtype[] = ['gram', 'quarter', 'half', 'full', 'ata', 'republic']
@@ -61,7 +62,7 @@ function assetEmoji(type: AssetType): string {
 function formAssetKey(form: FormState): string {
   if (form.type === 'gold') return `gold_${form.subtype}`
   if (form.type === 'silver') return 'silver_gram'
-  if (form.type === 'platinum') return 'silver_gram'
+  if (form.type === 'platinum') return 'platinum'
   if (form.type === 'currency') return `${form.currency_code.toLowerCase()}_try`
   return ''
 }
@@ -444,6 +445,34 @@ export function AssetsSection() {
                           </button>
                         ))}
                       </div>
+                      <p className="text-text-tertiary text-[11px] mt-1.5 pl-0.5">
+                        {CURRENCY_LABELS[form.currency_code] ?? form.currency_code}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Güncel fiyatlar */}
+                  {Object.keys(prices).length > 0 && (
+                    <div className="px-3 py-2.5 bg-white/[0.02] border border-white/[0.06] rounded-xl">
+                      <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px]">
+                        {(() => {
+                          let keys: string[] = []
+                          if (form.type === 'gold') keys = GOLD_SUBTYPES.map(s => `gold_${s}`)
+                          else if (form.type === 'silver') keys = ['silver_gram']
+                          else if (form.type === 'platinum') keys = ['platinum']
+                          else keys = CURRENCY_CODES.map(c => `${c.toLowerCase()}_try`)
+                          return keys.map(k => {
+                            const p = prices[k]?.price_tl
+                            const label = k.includes('gold_') ? GOLD_SUBTYPE_LABELS[k.replace('gold_', '') as GoldSubtype] : k.replace('_try', '').toUpperCase()
+                            return (
+                              <span key={k} className="text-text-tertiary">
+                                {label}: {p ? <span className="text-white font-medium">{p.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺</span> : <span className="text-text-tertiary/40">—</span>}
+                              </span>
+                            )
+                          })
+                        })()}
+                      </div>
+                      <p className="text-text-tertiary/50 text-[10px] mt-1.5">Fiyatları güncellemek için 'Güncelle' butonuna basınız</p>
                     </div>
                   )}
 
@@ -501,7 +530,7 @@ export function AssetsSection() {
                       type="text"
                       value={form.label}
                       onChange={e => setForm(f => ({ ...f, label: e.target.value }))}
-                      placeholder="ör. Düğün altınları"
+                      placeholder=""
                       className="w-full bg-background rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-primary/50"
                     />
                   </div>

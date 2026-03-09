@@ -32,7 +32,20 @@ dist-ssr
 # Vercel
 .vercel
 
+# AI editor configs
+.cursor
+.claude
+
+# Old/backup directories
+.git_old
+
 # Project references
 api_reference_file/
 google_calendar_backup
+
+# Database local scripts
+database/
+
+# Scratch test files
+test-*.js
 

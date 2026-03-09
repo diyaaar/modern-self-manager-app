@@ -63,7 +63,7 @@ export const ASSET_KEY_MAP: Record<AssetType, (subtype?: GoldSubtype | null, cur
     return map[subtype ?? 'gram'] ?? 'gold_gram'
   },
   silver: () => 'silver_gram',
-  platinum: () => 'silver_gram', // fallback, ileriye dönük
+  platinum: () => 'platinum',
   currency: (_, code) => `${(code ?? 'usd').toLowerCase()}_try`,
 }
 
@@ -72,23 +72,34 @@ export function getAssetKey(holding: Pick<AssetHolding, 'type' | 'subtype' | 'cu
 }
 
 export const ASSET_LABELS: Record<string, string> = {
-  gold_gram:     'Gram Altın',
-  gold_quarter:  'Çeyrek Altın',
-  gold_half:     'Yarım Altın',
-  gold_full:     'Tam Altın',
-  gold_ata:      'Ata Altın',
+  gold_gram: 'Gram Altın',
+  gold_quarter: 'Çeyrek Altın',
+  gold_half: 'Yarım Altın',
+  gold_full: 'Tam Altın',
+  gold_ata: 'Ata Altın',
   gold_republic: 'Cumhuriyet Altını',
-  silver_gram:   'Gram Gümüş',
-  platinum:      'Platin',
+  silver_gram: 'Gram Gümüş',
+  platinum: 'Platin',
+  usd_try: 'USD/TRY',
+  eur_try: 'EUR/TRY',
+  gbp_try: 'GBP/TRY',
+  chf_try: 'CHF/TRY',
 }
 
 export const GOLD_SUBTYPE_LABELS: Record<GoldSubtype, string> = {
-  gram:     'Gram',
-  quarter:  'Çeyrek',
-  half:     'Yarım',
-  full:     'Tam',
-  ata:      'Ata',
+  gram: 'Gram',
+  quarter: 'Çeyrek',
+  half: 'Yarım',
+  full: 'Tam',
+  ata: 'Ata',
   republic: 'Cumhuriyet',
+}
+
+export const CURRENCY_LABELS: Record<string, string> = {
+  USD: 'Amerikan Doları',
+  EUR: 'Euro',
+  GBP: 'İngiliz Sterlini',
+  CHF: 'İsviçre Frangı',
 }
 
 export function kurusToTl(kurus: number): number {
