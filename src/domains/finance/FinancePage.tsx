@@ -4,7 +4,7 @@
 // ============================================================
 
 import { useState } from 'react'
-import { BarChart2, ArrowLeftRight, CreditCard, RefreshCcw, FolderOpen, AlertCircle } from 'lucide-react'
+import { BarChart2, ArrowLeftRight, CreditCard, RefreshCcw, FolderOpen, AlertCircle, Coins } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useFinance } from '../../contexts/FinanceContext'
 import { FinanceDashboard } from './components/FinanceDashboard'
@@ -12,13 +12,15 @@ import { TransactionSection } from './components/TransactionSection'
 import { ObligationSection } from './components/ObligationSection'
 import { RecurringSection } from './components/RecurringSection'
 import { CategoryManager } from './components/CategoryManager'
+import { AssetsSection } from './components/AssetsSection'
 
-type FinanceTab = 'dashboard' | 'transactions' | 'obligations' | 'recurring' | 'categories'
+type FinanceTab = 'dashboard' | 'transactions' | 'obligations' | 'assets' | 'recurring' | 'categories'
 
 const TABS: { id: FinanceTab; label: string; Icon: React.ElementType }[] = [
     { id: 'dashboard', label: 'Özet', Icon: BarChart2 },
     { id: 'transactions', label: 'İşlemler', Icon: ArrowLeftRight },
     { id: 'obligations', label: 'Borç & Alacak', Icon: CreditCard },
+    { id: 'assets', label: 'Varlıklar', Icon: Coins },
     { id: 'recurring', label: 'Tekrarlayan', Icon: RefreshCcw },
     { id: 'categories', label: 'Kategoriler', Icon: FolderOpen },
 ]
@@ -84,6 +86,7 @@ export function FinancePage() {
                     {activeTab === 'dashboard' && <FinanceDashboard />}
                     {activeTab === 'transactions' && <TransactionSection />}
                     {activeTab === 'obligations' && <ObligationSection />}
+                    {activeTab === 'assets' && <AssetsSection />}
                     {activeTab === 'recurring' && <RecurringSection />}
                     {activeTab === 'categories' && <CategoryManager />}
                 </motion.div>

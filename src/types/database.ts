@@ -477,6 +477,73 @@ export interface Database {
           updated_at?: string | null
         }
       }
+      asset_holdings: {
+        Row: {
+          id: string
+          user_id: string
+          type: 'gold' | 'silver' | 'platinum' | 'currency'
+          subtype: 'gram' | 'quarter' | 'half' | 'full' | 'ata' | 'republic' | null
+          currency_code: string | null
+          quantity: number
+          purchase_price: number
+          purchase_date: string
+          label: string | null
+          note: string | null
+          created_at: string
+          updated_at: string | null
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          type: 'gold' | 'silver' | 'platinum' | 'currency'
+          subtype?: 'gram' | 'quarter' | 'half' | 'full' | 'ata' | 'republic' | null
+          currency_code?: string | null
+          quantity: number
+          purchase_price: number
+          purchase_date?: string
+          label?: string | null
+          note?: string | null
+          created_at?: string
+          updated_at?: string | null
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          type?: 'gold' | 'silver' | 'platinum' | 'currency'
+          subtype?: 'gram' | 'quarter' | 'half' | 'full' | 'ata' | 'republic' | null
+          currency_code?: string | null
+          quantity?: number
+          purchase_price?: number
+          purchase_date?: string
+          label?: string | null
+          note?: string | null
+          created_at?: string
+          updated_at?: string | null
+        }
+      }
+      asset_price_snapshots: {
+        Row: {
+          id: string
+          asset_key: string
+          price_try: number
+          fetched_at: string
+          source: string
+        }
+        Insert: {
+          id?: string
+          asset_key: string
+          price_try: number
+          fetched_at?: string
+          source?: string
+        }
+        Update: {
+          id?: string
+          asset_key?: string
+          price_try?: number
+          fetched_at?: string
+          source?: string
+        }
+      }
       google_calendar_tokens: {
         Row: {
           user_id: string
