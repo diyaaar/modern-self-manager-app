@@ -42,7 +42,7 @@ const TYPE_OPTIONS: { value: AssetType; label: string; emoji: string }[] = [
   { value: 'currency', label: 'Döviz', emoji: '💵' },
 ]
 
-const GOLD_SUBTYPES: GoldSubtype[] = ['gram', 'quarter', 'half', 'full', 'ata', 'republic']
+const GOLD_SUBTYPES: GoldSubtype[] = ['gram', 'quarter', 'half', 'full', 'ata']
 const CURRENCY_CODES = ['USD', 'EUR', 'GBP', 'CHF']
 
 function assetLabel(h: AssetHolding): string {
@@ -450,36 +450,12 @@ export function AssetsSection() {
                     </div>
                   )}
 
-                  {/* Güncel fiyatlar */}
-                  {Object.keys(prices).length > 0 && (
-                    <div className="px-3 py-2.5 bg-white/[0.02] border border-white/[0.06] rounded-xl">
-                      <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px]">
-                        {(() => {
-                          let keys: string[] = []
-                          if (form.type === 'gold') keys = GOLD_SUBTYPES.map(s => `gold_${s}`)
-                          else if (form.type === 'silver') keys = ['silver_gram']
-                          else keys = CURRENCY_CODES.map(c => `${c.toLowerCase()}_try`)
-                          return keys.map(k => {
-                            const p = prices[k]?.price_tl
-                            const label = k.includes('gold_') ? GOLD_SUBTYPE_LABELS[k.replace('gold_', '') as GoldSubtype] : k.replace('_try', '').toUpperCase()
-                            return (
-                              <span key={k} className="text-text-tertiary">
-                                {label}: {p ? <span className="text-white font-medium">{p.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺</span> : <span className="text-text-tertiary/40">—</span>}
-                              </span>
-                            )
-                          })
-                        })()}
-                      </div>
-                      <p className="text-text-tertiary/50 text-[10px] mt-1.5">Fiyatları güncellemek için 'Güncelle' butonuna basınız</p>
-                    </div>
-                  )}
-
-                  {/* Güncel fiyat göster */}
+                  {/* Seçilen varlığın güncel fiyatı */}
                   {formPriceTl > 0 && (
-                    <div className="flex items-center gap-2 px-3 py-2 bg-primary/8 rounded-xl">
+                    <div className="flex items-center gap-2 px-3 py-2 bg-white/[0.03] border border-white/[0.06] rounded-xl">
                       <span className="text-[10px] bg-emerald-500/15 text-emerald-400 rounded px-1.5 py-0.5">Canlı</span>
                       <span className="text-text-secondary text-xs">
-                        Güncel fiyat: <span className="text-white font-medium">{formPriceTl.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺</span>
+                        Birim fiyat: <span className="text-white font-medium">{formPriceTl.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺</span>
                       </span>
                     </div>
                   )}

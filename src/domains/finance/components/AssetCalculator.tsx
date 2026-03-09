@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { TrendingUp, TrendingDown, Info, Trophy, Target, Zap } from 'lucide-react'
+import { TrendingUp, TrendingDown, Trophy, Target, Zap } from 'lucide-react'
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer,
   CartesianGrid, ReferenceLine, ReferenceDot,
@@ -27,7 +27,6 @@ const GOLD_SUBTYPE_KEYS: { key: AssetKey; subtype: string }[] = [
   { key: 'gold_half', subtype: 'half' },
   { key: 'gold_full', subtype: 'full' },
   { key: 'gold_ata', subtype: 'ata' },
-  { key: 'gold_republic', subtype: 'republic' },
 ]
 
 const CURRENCY_KEYS: { key: AssetKey; code: string }[] = [
@@ -254,7 +253,7 @@ export function AssetCalculator({ prices }: Props) {
       {/* Kategori seçici */}
       <div>
         <p className="text-text-tertiary text-xs mb-3 uppercase tracking-wider font-medium">Varlık Seçin</p>
-        <div className="grid grid-cols-4 gap-2">
+        <div className="grid grid-cols-3 gap-2">
           {CATEGORY_OPTIONS.map(o => {
             const isActive = category === o.key
             return (
@@ -325,27 +324,19 @@ export function AssetCalculator({ prices }: Props) {
           </div>
         )}
 
-        {/* Güncel fiyatlar özeti */}
-        <div className="mt-3 px-3 py-2.5 bg-white/[0.02] border border-white/[0.06] rounded-xl">
-          <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px]">
-            {(() => {
-              // Kategoriye göre ilgili fiyatları göster
-              let keys: string[] = []
-              if (category === 'gold') keys = GOLD_SUBTYPE_KEYS.map(g => g.key)
-              else if (category === 'silver') keys = ['silver_gram']
-              else keys = CURRENCY_KEYS.map(c => c.key)
-              return keys.map(k => {
-                const p = prices[k]?.price_tl
-                return (
-                  <span key={k} className="text-text-tertiary">
-                    {ASSET_KEY_TO_LABEL[k as AssetKey]}: {p ? <span className="text-white font-medium">{p.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺</span> : <span className="text-text-tertiary/40">—</span>}
-                  </span>
-                )
-              })
-            })()}
+        {/* Gümüş: fiyatı inline göster */}
+        {category === 'silver' && (
+          <div className="mt-3 flex items-center gap-2 px-3 py-2 bg-white/[0.03] border border-white/[0.06] rounded-xl">
+            <span className="text-text-secondary text-xs">Gram Gümüş</span>
+            {prices['silver_gram']?.price_tl ? (
+              <span className="text-white text-xs font-medium">
+                {prices['silver_gram'].price_tl.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺
+              </span>
+            ) : (
+              <span className="text-text-tertiary/40 text-xs">—</span>
+            )}
           </div>
-          <p className="text-text-tertiary/50 text-[10px] mt-1.5">Fiyatları güncellemek için portföy sekmesinden 'Güncelle' butonuna basınız</p>
-        </div>
+        )}
       </div>
 
       {/* Ana grid */}
@@ -382,12 +373,6 @@ export function AssetCalculator({ prices }: Props) {
               />
               <span className="absolute right-3 top-1/2 -translate-y-1/2 text-text-tertiary text-sm">₺</span>
             </div>
-            {hasLivePrice && (
-              <p className="text-[11px] text-text-tertiary flex items-center gap-1">
-                <Info className="w-3 h-3" />
-                Güncel fiyat: {livePrice.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺ — üzerine yazarak özelleştirebilirsiniz
-              </p>
-            )}
           </div>
 
           {/* Alım Sıklığı & Miktar */}
