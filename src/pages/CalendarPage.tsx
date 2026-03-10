@@ -6,6 +6,7 @@ import tr from 'date-fns/locale/tr'
 import { motion } from 'framer-motion'
 import { useCalendar, CalendarEvent } from '../contexts/CalendarContext'
 import { useToast } from '../contexts/ToastContext'
+import { getColorHexFromId } from '../utils/colorUtils'
 import { CalendarSidebar } from '../components/calendar/CalendarSidebar'
 import { EventFormModal } from '../components/calendar/EventFormModal'
 import '../components/calendar/RBCTheme.css'
@@ -27,7 +28,21 @@ interface RBCEvent {
 function toRBCEvent(ev: CalendarEvent): RBCEvent {
   const isAllDay = typeof ev.allDay === 'boolean' ? ev.allDay : ev.start?.length === 10
   const start = ev.start ? new Date(ev.start) : new Date()
-  const end = ev.end ? new Date(ev.end) : new Date(start.getTime() + 60 * 60 * 1000)
+  let end = ev.end ? new Date(ev.end) : new Date(start.getTime() + 60 * 60 * 1000)
+
+  // Google Calendar API returns exclusive end dates for all-day events
+  // (e.g. a single-day event on March 26 has end = March 27).
+  // react-big-calendar treats end dates inclusively, so we subtract one day
+  // to prevent the event from spanning an extra day on the calendar view.
+  if (isAllDay && ev.end) {
+    end = new Date(end.getTime() - 24 * 60 * 60 * 1000)
+    // If subtracting made end < start (shouldn't happen, but safety check),
+    // set end = start so the event still shows on its start day.
+    if (end < start) {
+      end = new Date(start)
+    }
+  }
+
   return {
     id: ev.id,
     title: ev.summary || 'Başlıksız',
@@ -133,10 +148,9 @@ export function CalendarPage() {
   }, [])
 
   const handleSelectSlot = useCallback((slotInfo: SlotInfo) => {
-    setSelectedEvent(null)
-    setSlotStart(slotInfo.start)
-    setSlotEnd(slotInfo.end)
-    setFormOpen(true)
+    // Drill down to day view for the selected date instead of opening the event form
+    setCurrentDate(slotInfo.start)
+    setView('day')
   }, [])
 
   const handleNewEvent = useCallback(() => {
@@ -156,7 +170,9 @@ export function CalendarPage() {
   // ── Event style: use the event's color ──────────────────────
   const eventStyleGetter = useCallback((rbcEvent: RBCEvent) => {
     const ev = rbcEvent.resource
-    const bg = ev.color || 'rgb(16, 185, 129)'
+    // Priority: per-event colorId (Google Calendar color 1-11) > calendar-level color > default emerald
+    const eventColor = ev.colorId ? getColorHexFromId(Number(ev.colorId)) : null
+    const bg = eventColor || ev.color || 'rgb(16, 185, 129)'
     return {
       style: {
         backgroundColor: bg,
