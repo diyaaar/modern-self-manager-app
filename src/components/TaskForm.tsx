@@ -15,6 +15,8 @@ import { useToast } from '../contexts/ToastContext'
 import { TaskWithSubtasks } from '../types/task'
 import { format } from 'date-fns'
 import { TagInput } from './TagInput'
+import { formatDateTimeForCalendar } from '../lib/calendarEventFormat'
+import { parseDBTimestamp } from '../utils/dateUtils'
 
 interface TaskFormProps {
   task?: TaskWithSubtasks
@@ -33,7 +35,7 @@ export function TaskForm({ task, parentTaskId, onCancel, onSave }: TaskFormProps
   const [title, setTitle] = useState(task?.title || '')
   const [description, setDescription] = useState(task?.description || '')
   const [priority, setPriority] = useState<'low' | 'medium' | 'high' | null>(task?.priority || null)
-  const [deadline, setDeadline] = useState(task?.deadline ? new Date(task.deadline).toISOString().slice(0, 16) : '')
+  const [deadline, setDeadline] = useState(task?.deadline ? formatDateTimeForCalendar(parseDBTimestamp(task.deadline)).slice(0, 16) : '')
   const [tags, setTags] = useState<any[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)

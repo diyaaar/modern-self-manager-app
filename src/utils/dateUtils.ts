@@ -3,6 +3,21 @@ import tr from 'date-fns/locale/tr'
 import { enUS } from 'date-fns/locale'
 
 /**
+ * Parse a timestamp string from Supabase, ensuring UTC interpretation.
+ * Supabase returns timestamptz values without timezone offset suffix
+ * (e.g., "2026-03-22T14:00:00" instead of "2026-03-22T14:00:00Z"),
+ * causing parseISO/new Date() to incorrectly interpret them as local time.
+ */
+export function parseDBTimestamp(timestamp: string): Date {
+  if (!timestamp) return new Date(timestamp)
+  // Already has timezone info (Z, +HH:MM, or -HH:MM)
+  if (/Z|[+-]\d{2}(:\d{2})?$/.test(timestamp)) {
+    return parseISO(timestamp)
+  }
+  return parseISO(timestamp + 'Z')
+}
+
+/**
  * Get current date, time, and day of week
  */
 export function getCurrentDateTime() {
@@ -105,7 +120,7 @@ export function getDeadlineColor(deadline: string | null): string {
   if (!deadline) return 'text-text-tertiary'
 
   try {
-    const deadlineDate = parseISO(deadline)
+    const deadlineDate = parseDBTimestamp(deadline)
     const today = new Date()
     today.setHours(0, 0, 0, 0)
     const deadlineDay = new Date(deadlineDate)
@@ -140,7 +155,7 @@ export function formatDeadline(deadline: string | null, time: string | null = nu
   if (!deadline) return 'No deadline'
 
   try {
-    const deadlineDate = parseISO(deadline)
+    const deadlineDate = parseDBTimestamp(deadline)
     const formattedDate = format(deadlineDate, 'MMM d, yyyy', { locale: enUS })
     
     // If time is explicitly provided, use it

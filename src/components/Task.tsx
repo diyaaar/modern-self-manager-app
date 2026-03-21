@@ -28,7 +28,7 @@ import { useCalendar } from '../contexts/CalendarContext'
 import { getSupabaseClient } from '../lib/supabase'
 import { calculateCompletionPercentage } from '../utils/taskUtils'
 import { isPast, isToday, addHours } from 'date-fns'
-import { getDeadlineColor, formatDeadline } from '../utils/dateUtils'
+import { getDeadlineColor, formatDeadline, parseDBTimestamp } from '../utils/dateUtils'
 import { TaskForm } from './TaskForm'
 import { AISuggestionsModal } from './AISuggestionsModal'
 import { TagBadge } from './TagBadge'
@@ -232,7 +232,7 @@ export function Task({ task, depth = 0 }: TaskProps) {
 
   const hasSubtasks = task.subtasks && task.subtasks.length > 0
   const completionPercentage = calculateCompletionPercentage(task)
-  const isOverdue = task.deadline && !task.completed && isPast(new Date(task.deadline)) && !isToday(new Date(task.deadline))
+  const isOverdue = task.deadline && !task.completed && isPast(parseDBTimestamp(task.deadline)) && !isToday(parseDBTimestamp(task.deadline))
 
   const getPriorityStyles = () => {
     switch (task.priority) {
@@ -256,7 +256,7 @@ export function Task({ task, depth = 0 }: TaskProps) {
   const handleAddToCalendar = async () => {
     setIsAddingToCalendar(true)
     try {
-      const startDate = task.deadline ? new Date(task.deadline) : addHours(new Date(), 1)
+      const startDate = task.deadline ? parseDBTimestamp(task.deadline) : addHours(new Date(), 1)
       const startStr = formatDateTimeForCalendar(startDate)
       const endStr = formatDateTimeForCalendar(addHours(startDate, 1))
 
